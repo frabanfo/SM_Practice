@@ -1,0 +1,24 @@
+# R
+.Rhistory
+.RData
+.Rproj.user/
+.Ruserdata
+
+# Output RMarkdown
+*_files/
+*_cache/
+*.html
+# PDF compilati ignorati tranne quello del cheatsheet
+*.pdf
+!cheatsheet/SM_cheatsheet_esame.pdf
+
+# LaTeX intermedi
+*.aux
+*.log
+*.out
+*.toc
+*.tex
+
+# Sistema
+.DS_Store
+Thumbs.db

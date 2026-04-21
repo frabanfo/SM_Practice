@@ -1,0 +1,168 @@
+---
+title: "Statistical Modelling — Cheat Sheet Esame"
+author: "Fra"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    number_sections: true
+  pdf_document:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+    highlight: tango
+fontsize: 10pt
+geometry: margin=2cm
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 6,
+  fig.height = 4,
+  fig.align = "center"
+)
+```
+
+# Setup
+
+## Librerie standard
+
+```{r libraries, eval=FALSE}
+# Caricamento librerie usate nel corso
+library(MASS)       # stepAIC, Boston dataset
+library(car)        # vif, diagnostica
+library(corrplot)   # visualizzazione matrici di correlazione
+library(boot)       # bootstrap
+library(ppcor)      # correlazioni parziali
+```
+
+## Import dati tipico
+
+```{r import-template, eval=FALSE}
+# Da CSV
+df <- read.csv("percorso/al/file.csv", header = TRUE, stringsAsFactors = TRUE)
+
+# Prima ispezione
+str(df)
+summary(df)
+head(df)
+dim(df)
+```
+
+---
+
+# 1. Distribuzioni e Variabili Casuali
+
+## 1.1 Generare campioni, QQ-plot, ECDF
+
+<!-- Giorno 1: inserire qui codice + commenti template -->
+
+## 1.2 Normale bivariata e multivariata
+
+<!-- Giorno 2: inserire qui codice + commenti template -->
+
+---
+
+# 2. Misure di Associazione
+
+<!-- Giorno 2: correlazioni, correlazioni parziali, corrplot -->
+
+---
+
+# 3. Inferenza
+
+## 3.1 Maximum Likelihood Estimation
+
+<!-- Giorno 3: template log-likelihood + optim -->
+
+## 3.2 Bootstrap e intervalli di confidenza
+
+<!-- Giorno 4: bootstrap manuale + libreria boot + percentile CI -->
+
+---
+
+# 4. Regressione Lineare Multipla
+
+## 4.1 Fit del modello e lettura del summary
+
+<!-- Giorno 6-7: lm(), summary, coefficienti, R^2 -->
+
+## 4.2 Diagnostica (residui, leverage, Cook, VIF)
+
+<!-- Giorno 8, 10: diagnostic plots, hatvalues, cooks.distance, vif -->
+
+### Tabella riassuntiva diagnostica
+
+| Sintomo | Strumento | Soglia indicativa |
+|---------|-----------|-------------------|
+| Outlier nei residui | residui standardizzati | > |2| o > |3| |
+| Leverage alto | h_ii | > 2p/n |
+| Punto influente | distanza di Cook | > 1 (o > 4/n) |
+| Multicollinearità | VIF | > 5 (attenzione), > 10 (serio) |
+
+## 4.3 Inferenza: F-test, t-test, intervalli di confidenza
+
+<!-- Giorno 9: anova, confint, interpretazione -->
+
+## 4.4 Variabili categoriche e interazioni
+
+<!-- Giorno 12: dummy, relevel, interpretazione coefficienti, interazioni -->
+
+## 4.5 Selezione del modello
+
+<!-- Giorno 11: step, stepAIC, AIC vs BIC -->
+
+## 4.6 Predizione (CI vs PI)
+
+<!-- Giorno 11: predict con interval="confidence" vs "prediction" -->
+
+---
+
+# 5. Regressione Logistica
+
+## 5.1 Fit con glm e lettura del summary
+
+<!-- Giorno 13-14: glm(family=binomial) -->
+
+## 5.2 Odds ratio e interpretazione
+
+<!-- Giorno 13: exp(coef), exp(confint), template commento -->
+
+## 5.3 Selezione del modello e predizione
+
+<!-- Giorno 14: step su glm, predict type="response" -->
+
+---
+
+# 6. Flowchart Decisionale
+
+<!-- Giorno 15: guida "dato un problema X, quali passi?" -->
+
+## Schema rapido
+
+- **Risposta continua** → `lm()`
+  - Verifica assunzioni: `plot(model)` (4 diagnostic plots)
+  - Controlla multicollinearità: `vif(model)`
+  - Troppe covariate: `stepAIC(model)`
+  - Predizione: `predict(..., interval = "confidence" | "prediction")`
+- **Risposta binaria** → `glm(family = binomial)`
+  - Interpretazione: `exp(coef(model))` per odds ratio
+  - Predizione probabilità: `predict(..., type = "response")`
+- **CI per statistica non standard** → bootstrap (manuale o `boot::boot`)
+- **Correlazione "sparisce" condizionando su Z** → correlazione parziale (`ppcor::pcor`)
+
+---
+
+# 7. Trappole Comuni
+
+<!-- Annotare qui errori frequenti durante lo studio -->
+
+- R² aumenta sempre aggiungendo covariate (anche inutili) → usare R² adj per confronti
+- F-test significativo ma nessun t-test significativo → sintomo di multicollinearità
+- Leverage alto ≠ punto influente (può esserlo o no)
+- Nei GLM: Wald test nel summary, likelihood ratio test via `anova(mod, test = "Chisq")`
