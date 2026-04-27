@@ -1,0 +1,262 @@
+---
+title: "Lab 02 — Bivariate Normal Distribution (HW Exercise 7)"
+subtitle: "Statistical Modelling — Settimana 1, Giorno 2"
+author: "Fra"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+  pdf_document:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 6,
+  fig.height = 4,
+  fig.align = "center"
+)
+```
+
+# Obiettivi della sessione
+
+Replico l'**Esercizio 7** delle HomeWorks (formato che il prof valuta all'esame):
+
+> Generare 3000 realizzazioni dalla bivariata $\mathcal{N}(0, 0, \sigma_{x_1} = 3, \sigma_{x_2} = 3, \sigma_{x_1 x_2} = 0)$ con seed = 625, e:
+>
+> 1. Riportare e commentare le statistiche descrittive di ciascuna serie
+> 2. Disegnare scatter plot univariato e bivariato e commentare
+> 3. QQ-plot per entrambe le serie e commentare
+> 4. Calcolare la densità teorica su una griglia, plot 3D e commentare
+> 5. Disegnare e interpretare il contour plot
+> 6. Estrarre autovalori e autovettori della matrice var-cov, mostrare la decomposizione spettrale
+
+Tema centrale: capire **come si comporta una normale bivariata con correlazione zero** e collegare la teoria (proprietà 1, 2, 4 della normale bivariata) all'evidenza grafica e numerica.
+
+---
+
+# Setup
+
+```{r libraries}
+library(mvtnorm)         # rmvnorm, dmvnorm
+library(scatterplot3d)   # plot 3D della densità
+```
+
+> **Nota sui parametri**: il testo dell'esercizio dice $\sigma_{x_1} = \sigma_{x_2} = 3$. Da pdf delle Solutions emerge che il prof interpreta queste come **varianze** ($\sigma^2 = 9$, quindi $\sigma = 3$). Replico la sua interpretazione per coerenza.
+
+---
+
+# 7.1 Generazione dei dati e statistiche descrittive
+
+```{r generate}
+set.seed(625)
+
+mu <- c(0, 0)
+sigma <- matrix(c(9, 0,
+                  0, 9), ncol = 2)
+
+X <- rmvnorm(n = 3000, mean = mu, sigma = sigma)
+
+dim(X)
+head(X)
+```
+
+**Cosa è successo**: `rmvnorm` restituisce una matrice $3000 \times 2$. Ogni riga è una realizzazione del vettore aleatorio $(X_1, X_2)$. Le due colonne corrispondono alle due componenti.
+
+## Statistiche descrittive di ciascuna componente
+
+```{r summaries}
+summary(X)
+
+# Deviazioni standard e covarianza
+sd(X[, 1])
+sd(X[, 2])
+cov(X[, 1], X[, 2])
+```
+
+**Commento.**
+
+Per entrambe le componenti, mediana e media assumono valori molto simili tra loro e prossimi a zero (valore teorico assegnato alla media). Lo studio dei quartili evidenzia simmetria dei dati attorno ai valori centrali. In sintesi, i valori generati per entrambe le componenti appaiono coerenti con quelli attesi da una distribuzione $\mathcal{N}(0, 9)$ marginale (proprietà 2 della normale bivariata: le marginali sono normali univariate).
+
+Le deviazioni standard sono entrambe vicine al valore teorico di 3, coerentemente con quanto specificato nella matrice $\Sigma$. La covarianza calcolata sui dati simulati assume un valore molto piccolo, prossimo allo zero teorico — la piccola deviazione è attribuibile alla variabilità campionaria. Le due componenti sono quindi linearmente scorrelate, come imposto in fase di simulazione.
+
+---
+
+# 7.2 Scatter plot bivariato
+
+```{r scatter}
+plot(X[, 1], X[, 2],
+     col = "blue",
+     pch = 16, cex = 0.5,
+     main = "Scatter plot della bivariata N(0, 0, 3, 3, 0)",
+     xlab = "First component (X1)",
+     ylab = "Second component (X2)")
+abline(h = 0, v = 0, lty = 2, col = "gray")
+```
+
+**Commento.**
+
+Il grafico mostra le realizzazioni della bivariata nel piano cartesiano. La maggior parte dei punti si concentra attorno alla media $(0, 0)$, con un numero limitato di punti che deviano dalla regione centrale. Il range di variazione è approssimativamente lo stesso per le due componenti, indicando varianze simili.
+
+I punti sono disposti in una **regione di forma circolare**, **senza alcun orientamento ben definito**. Questa è la firma visiva di:
+
+1. $\rho = 0$ (assenza di correlazione lineare → nessuna inclinazione)
+2. $\sigma_{X_1} = \sigma_{X_2}$ (uguale dispersione → forma circolare e non ellittica schiacciata)
+
+Sotto normalità bivariata, $\rho = 0$ implica indipendenza (proprietà esclusiva della normale): nessuna struttura sistematica visibile è quindi attesa.
+
+---
+
+# 7.3 QQ-plot delle marginali
+
+```{r qqplot, fig.width=8, fig.height=4}
+par(mfrow = c(1, 2))
+
+qqnorm(X[, 1], col = "dodgerblue", main = "QQ-plot — First component (X1)")
+qqline(X[, 1])
+
+qqnorm(X[, 2], col = "dodgerblue", main = "QQ-plot — Second component (X2)")
+qqline(X[, 2])
+
+par(mfrow = c(1, 1))
+```
+
+**Commento.**
+
+In entrambi i grafici, i punti si dispongono lungo la bisettrice del primo e terzo quadrante in modo molto vicino, indicando che i quantili empirici e quelli teorici della normale standard coincidono. Solo agli estremi delle code si osservano lievi deviazioni — comportamento atteso, dovuto alla variabilità campionaria nelle code dove ci sono poche osservazioni.
+
+Questa è una **conferma empirica della proprietà 2** della normale bivariata: le distribuzioni marginali di una normale bivariata sono univariate normali. La generazione tramite `rmvnorm` ha prodotto marginali coerenti con $\mathcal{N}(0, 9)$.
+
+---
+
+# 7.4 Densità teorica e plot 3D
+
+```{r density-3d, fig.width=7, fig.height=6}
+# griglia di valori per X1 e X2
+z1 <- seq(min(X[, 1]), max(X[, 1]), length.out = 50)
+z2 <- seq(min(X[, 2]), max(X[, 2]), length.out = 50)
+grid <- expand.grid(z1, z2)
+
+# densità teorica calcolata sulla griglia
+dens <- matrix(dmvnorm(grid, mean = mu, sigma = sigma),
+               ncol = length(z1), byrow = TRUE)
+
+# scatterplot 3D vuoto su cui sovrapporre le linee della densità
+plot3d <- scatterplot3d(z1, z2,
+                        seq(min(dens), max(dens), length.out = length(z1)),
+                        xlim = c(min(X[, 1]), max(X[, 1])),
+                        ylim = c(min(X[, 2]), max(X[, 2])),
+                        type = "n", angle = 70, grid = FALSE,
+                        main = "Densità teorica della bivariata N(0, 0, 3, 3, 0)",
+                        xlab = expression(X[1]),
+                        ylab = expression(X[2]),
+                        zlab = "f(X1, X2)")
+
+# linee parallele all'asse X1
+for (i in length(z1):1) {
+  plot3d$points3d(rep(z1[i], length(z2)), z2, dens[i, ],
+                  type = "l", col = "darkorange")
+}
+
+# linee parallele all'asse X2
+for (i in length(z2):1) {
+  plot3d$points3d(z1, rep(z2[i], length(z1)), dens[, i],
+                  type = "l", col = "darkorange")
+}
+```
+
+**Commento.**
+
+La superficie tridimensionale evidenzia la classica **forma a campana** della distribuzione bivariata gaussiana, centrata nell'origine $(0, 0)$. La simmetria della superficie è perfetta: rotando la "campana" attorno all'asse verticale (passante per la media), la forma rimane invariata. Questa simmetria rotazionale è una conseguenza diretta del fatto che $\sigma_{X_1} = \sigma_{X_2}$ e $\rho = 0$.
+
+Il valore massimo della densità è raggiunto in $(0, 0)$ (la media), e la densità decresce in modo simmetrico in tutte le direzioni allontanandosi dal centro.
+
+---
+
+# 7.5 Contour plot
+
+```{r contour, fig.width=6, fig.height=6}
+# griglia più fine per un contour plot pulito
+z1 <- seq(-10, 10, length.out = 300)
+z2 <- seq(-10, 10, length.out = 300)
+grid <- expand.grid(z1, z2)
+dens <- matrix(dmvnorm(grid, mean = mu, sigma = sigma), ncol = length(z1))
+
+contour(z1, z2, dens,
+        col = "blue",
+        main = "Contour plot — bivariata N(0, 0, 3, 3, 0)",
+        xlab = "First component (X1)",
+        ylab = "Second component (X2)",
+        xlim = c(-10, 10), ylim = c(-10, 10),
+        asp = 1)
+abline(h = 0, v = 0, lty = 2, col = "gray")
+```
+
+**Commento.**
+
+Le curve di livello (isodensità) hanno **forma perfettamente circolare** e **nessun orientamento privilegiato**. Questo comportamento è spiegato dalla concomitanza di due caratteristiche:
+
+1. La **stessa variabilità** delle due componenti ($\sigma_{X_1} = \sigma_{X_2} = 3$): garantisce che gli assi maggiore e minore dell'ellisse siano uguali → il caso degenere dell'ellisse è il cerchio
+2. Il **valore zero della correlazione**: garantisce che gli assi dell'ellisse coincidano con gli assi cartesiani → nessuna inclinazione
+
+Il centro dei cerchi coincide con la media della distribuzione, $(0, 0)$. Le curve più interne corrispondono ai valori più alti della densità (vicino al picco della "campana"), quelle più esterne ai valori più bassi.
+
+Questo è il caso più "neutro" possibile per una bivariata: le due variabili sono indipendenti (proprietà 1 della bivariata: $\rho = 0$ implica indipendenza per la normale) e hanno la stessa scala.
+
+---
+
+# 7.6 Decomposizione spettrale di $\Sigma$
+
+```{r spectral}
+eig <- eigen(sigma)
+
+# autovalori
+Eig.Val <- eig$values
+Eig.Val
+
+# autovettori (uno per colonna)
+Eig.Vec <- eig$vectors
+Eig.Vec
+```
+
+**Verifica della decomposizione spettrale**: $\Sigma = Q \Lambda Q^\top$
+
+```{r spectral-check}
+Eig.Vec %*% diag(Eig.Val) %*% t(Eig.Vec)
+```
+
+Il prodotto restituisce esattamente $\Sigma$ originale, confermando la validità della decomposizione.
+
+**Commento.**
+
+I due autovalori sono entrambi pari a 9 (cioè $\sigma_{X_1}^2 = \sigma_{X_2}^2$). Geometricamente, essi rappresentano le **varianze lungo gli assi principali** dell'ellissoide di isodensità. Il fatto che siano uguali conferma la simmetria rotazionale già osservata nel contour plot: nessuna direzione "spiega" più variabilità di un'altra.
+
+Gli autovettori sono ortogonali (come da teoria, dato che $\Sigma$ è simmetrica e definita positiva) e definiscono le direzioni degli assi principali. Tuttavia, **quando gli autovalori sono uguali la scelta degli autovettori è arbitraria**: qualsiasi coppia di vettori ortogonali andrebbe bene. R ne sceglie una particolare ($(0,1)$ e $(-1,0)$ in questo caso) ma non c'è significato fisico in quella scelta specifica.
+
+> **Implicazione**: la spectral decomposition è la base della **Principal Component Analysis (PCA)**: gli autovettori indicano le direzioni di massima variabilità nei dati, gli autovalori la magnitudine. In questo caso degenere (autovalori uguali) la PCA non aggiungerebbe informazione: tutte le direzioni sono equivalenti. È invece molto utile quando $\sigma_{X_1} \neq \sigma_{X_2}$ o $\rho \neq 0$ — le situazioni che vedremo nell'Esercizio 8.
+
+---
+
+# Conclusioni della sessione
+
+Ho verificato sperimentalmente le **5 proprietà chiave della normale bivariata** in un caso semplice ($\rho = 0$, varianze uguali):
+
+1. ✓ **Simmetria rotazionale** (dal plot 3D e contour)
+2. ✓ **Marginali univariate normali** (dai QQ-plot)
+3. ✓ **Indipendenza sotto $\rho = 0$** (dalla forma circolare e dall'assenza di pattern nello scatter)
+4. ✓ **Curve di livello ellissoidali** (qui degeneri in cerchi)
+5. ✓ **Decomposizione spettrale di $\Sigma$** definisce gli assi principali
+
+**Cosa resta per il cheat-sheet (sezioni 3 e 4 del tuo numbering):**
+- Generazione e visualizzazione della bivariata (`mvrnorm` o `rmvnorm`)
+- Contour plot come strumento diagnostico per visualizzare correlazione/varianze
+- Decomposizione spettrale come operazione standard su matrici simmetriche
+- Template di commento per ogni tipo di output (li costruiamo dopo questo lab)
+
+**Prossimo passo logico**: ripetere l'analisi con $\rho \neq 0$ e $\sigma_{X_1} \neq \sigma_{X_2}$ (Esercizio 8 delle HW) per vedere come cambiano scatter, contour ed ellissi quando ci si allontana dal caso "neutro".

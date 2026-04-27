@@ -1,0 +1,254 @@
+---
+title: "Lab 03 — Bivariate Normal Distribution with Negative Correlation (HW Exercise 8)"
+subtitle: "Statistical Modelling — Settimana 1, Giorno 2 (estensione)"
+author: "Fra"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 6,
+  fig.height = 4,
+  fig.align = "center"
+)
+```
+
+# Obiettivi della sessione
+
+Replico l'**Esercizio 8** delle HomeWorks: stessa struttura dell'Esercizio 7 ma con parametri diversi:
+
+- $\mu_{x_1} = \mu_{x_2} = 0$
+- $\sigma_{x_1} = \sigma_{x_2} = 10$ (interpretato come varianze, $\sigma = \sqrt{10}$)
+- $\sigma_{x_1 x_2} = -2$ (covarianza **negativa**)
+
+Confronto i risultati con quelli ottenuti nel lab02 ($\rho = 0$) per evidenziare cosa cambia quando si introduce correlazione.
+
+> **Nota sull'interpretazione dei parametri**: il testo dice "$\sigma_{x_1} = \sigma_{x_2} = 10$, $\sigma_{x_1 x_2} = -2$". In coerenza con la convenzione adottata da Brusa nelle Solutions ufficiali per Es. 7, interpreto $\sigma_{x_1}$ come varianza, e $\sigma_{x_1 x_2}$ come covarianza. Quindi $\rho = -2 / \sqrt{10 \cdot 10} = -0.2$ (correlazione debole-moderata negativa).
+
+---
+
+# Setup
+
+```{r libraries}
+library(mvtnorm)
+library(scatterplot3d)
+```
+
+---
+
+# 8.1 Generazione dei dati e statistiche descrittive
+
+```{r generate}
+set.seed(625)
+
+mu <- c(0, 0)
+sigma <- matrix(c(10, -2,
+                  -2, 10), ncol = 2)
+
+X <- rmvnorm(n = 3000, mean = mu, sigma = sigma)
+
+dim(X)
+head(X)
+```
+
+## Statistiche descrittive
+
+```{r summaries}
+summary(X)
+
+sd(X[, 1])
+sd(X[, 2])
+cov(X[, 1], X[, 2])
+cor(X[, 1], X[, 2])
+```
+
+**Commento.**
+
+Per entrambe le componenti, mediana e media assumono valori prossimi a zero, in coerenza con il valore teorico imposto. Lo studio dei quartili evidenzia simmetria attorno al centro della distribuzione.
+
+Le deviazioni standard sono entrambe vicine a $\sqrt{10} \approx 3.16$, coerentemente con i parametri specificati. La covarianza calcolata sul campione assume un valore prossimo al valore teorico di $-2$, e il coefficiente di correlazione è circa $-0.2$. Questa è una **correlazione debole negativa**: quando $X_1$ assume valori sopra la media, $X_2$ tende leggermente a stare sotto la media, e viceversa, ma la relazione è poco marcata.
+
+Rispetto al lab02 (Es. 7) dove $\rho = 0$, qui ci aspettiamo:
+
+- una **leggera inclinazione "\\"** della nuvola di punti nello scatter plot
+- ellissi di isodensità con asse maggiore lungo la direzione "\\" (alto-sinistra a basso-destra)
+- ma la deviazione dal caso circolare sarà **modesta** dato il piccolo valore di $|\rho|$
+
+---
+
+# 8.2 Scatter plot bivariato
+
+```{r scatter}
+plot(X[, 1], X[, 2],
+     col = "blue",
+     pch = 16, cex = 0.5,
+     main = "Scatter plot — bivariata con cov = -2",
+     xlab = "First component (X1)",
+     ylab = "Second component (X2)")
+abline(h = 0, v = 0, lty = 2, col = "gray")
+```
+
+**Commento.**
+
+I punti si distribuiscono ancora attorno alla media $(0, 0)$, con range di variazione simile per entrambe le componenti (varianze uguali). A differenza del caso $\rho = 0$ (lab02), si può **intuire** una lieve struttura: la nuvola appare lievemente allungata lungo la direzione "\\" — alto-sinistra verso basso-destra — coerentemente con la covarianza negativa.
+
+Tuttavia, dato che $\rho \approx -0.2$ è molto debole, la deviazione dal caso circolare è poco evidente a occhio nudo: serve il contour plot per vedere chiaramente l'inclinazione.
+
+---
+
+# 8.3 QQ-plot delle marginali
+
+```{r qqplot, fig.width=8, fig.height=4}
+par(mfrow = c(1, 2))
+
+qqnorm(X[, 1], col = "dodgerblue", main = "QQ-plot — First component (X1)")
+qqline(X[, 1])
+
+qqnorm(X[, 2], col = "dodgerblue", main = "QQ-plot — Second component (X2)")
+qqline(X[, 2])
+
+par(mfrow = c(1, 1))
+```
+
+**Commento.**
+
+Anche in questo caso, i punti si dispongono lungo la bisettrice del primo e terzo quadrante in modo molto vicino, con piccole deviazioni solo agli estremi delle code (variabilità campionaria). Questa è la conferma che la **proprietà 2** della normale bivariata vale **indipendentemente dalla correlazione**: le marginali sono sempre normali univariate, $\rho$ non influenza la forma delle marginali ma solo la loro struttura di dipendenza congiunta.
+
+---
+
+# 8.4 Densità teorica e plot 3D
+
+```{r density-3d, fig.width=7, fig.height=6}
+z1 <- seq(min(X[, 1]), max(X[, 1]), length.out = 50)
+z2 <- seq(min(X[, 2]), max(X[, 2]), length.out = 50)
+grid <- expand.grid(z1, z2)
+
+dens <- matrix(dmvnorm(grid, mean = mu, sigma = sigma),
+               ncol = length(z1), byrow = TRUE)
+
+plot3d <- scatterplot3d(z1, z2,
+                        seq(min(dens), max(dens), length.out = length(z1)),
+                        xlim = c(min(X[, 1]), max(X[, 1])),
+                        ylim = c(min(X[, 2]), max(X[, 2])),
+                        type = "n", angle = 70, grid = FALSE,
+                        main = "Densità teorica della bivariata con cov = -2",
+                        xlab = expression(X[1]),
+                        ylab = expression(X[2]),
+                        zlab = "f(X1, X2)")
+
+for (i in length(z1):1) {
+  plot3d$points3d(rep(z1[i], length(z2)), z2, dens[i, ],
+                  type = "l", col = "darkorange")
+}
+for (i in length(z2):1) {
+  plot3d$points3d(z1, rep(z2[i], length(z1)), dens[, i],
+                  type = "l", col = "darkorange")
+}
+```
+
+**Commento.**
+
+La superficie tridimensionale conserva la **forma a campana**, con il picco centrato nell'origine. Tuttavia, a differenza del caso $\rho = 0$, la base della campana **non è più perfettamente circolare**: si osserva un lieve allungamento lungo la direzione "\\" (alto-sinistra verso basso-destra), in coerenza con il segno negativo della covarianza.
+
+L'altezza massima della densità è leggermente più alta rispetto al caso $\rho = 0$ con stesse varianze: la presenza di correlazione concentra leggermente la massa di probabilità lungo l'asse principale.
+
+---
+
+# 8.5 Contour plot
+
+```{r contour, fig.width=6, fig.height=6}
+z1 <- seq(-12, 12, length.out = 300)
+z2 <- seq(-12, 12, length.out = 300)
+grid <- expand.grid(z1, z2)
+dens <- matrix(dmvnorm(grid, mean = mu, sigma = sigma), ncol = length(z1))
+
+contour(z1, z2, dens,
+        col = "blue",
+        main = "Contour plot — bivariata con cov = -2",
+        xlab = "First component (X1)",
+        ylab = "Second component (X2)",
+        xlim = c(-12, 12), ylim = c(-12, 12),
+        asp = 1)
+abline(h = 0, v = 0, lty = 2, col = "gray")
+```
+
+**Commento.**
+
+Le curve di livello hanno ora **forma ellittica** (non più circolare come nel caso di Es. 7) con **inclinazione lungo la direzione "\\"**. Questa è la firma visiva della correlazione negativa: l'asse maggiore dell'ellisse punta nel quadrante alto-sinistra ↔ basso-destra.
+
+Tuttavia, dato il piccolo valore di $|\rho| \approx 0.2$, l'ellisse è solo **leggermente** schiacciata rispetto al cerchio. Se $\rho$ fosse stato $-0.9$, le ellissi sarebbero state molto più appiattite e l'inclinazione molto più evidente.
+
+**Confronto con Es. 7:**
+
+| Caratteristica | Es. 7 ($\rho = 0$) | Es. 8 ($\rho \approx -0.2$) |
+|----------------|---------------------|---------------------------|
+| Forma contorni | Cerchi perfetti | Ellissi leggermente schiacciate |
+| Inclinazione | Nessuna | "\\" (lieve) |
+| Indipendenza | Sì (per la normale, $\rho = 0 \Rightarrow$ indip.) | No: c'è dipendenza lineare debole |
+
+---
+
+# 8.6 Decomposizione spettrale di $\Sigma$
+
+```{r spectral}
+eig <- eigen(sigma)
+
+Eig.Val <- eig$values
+Eig.Val
+
+Eig.Vec <- eig$vectors
+Eig.Vec
+```
+
+**Verifica della decomposizione**: $\Sigma = Q \Lambda Q^\top$
+
+```{r spectral-check}
+Eig.Vec %*% diag(Eig.Val) %*% t(Eig.Vec)
+```
+
+**Commento.**
+
+Gli autovalori sono $\lambda_1 = 12$ e $\lambda_2 = 8$. **Differiscono tra loro** (a differenza del caso di Es. 7 dove erano entrambi pari a 9). Geometricamente:
+
+- $\lambda_1 = 12$ è la varianza lungo la **direzione di massima dispersione** (asse maggiore dell'ellisse)
+- $\lambda_2 = 8$ è la varianza lungo la **direzione di minima dispersione** (asse minore)
+
+La somma degli autovalori è $\lambda_1 + \lambda_2 = 20$, che coincide con la **traccia di $\Sigma$** ($10 + 10 = 20$): è la **varianza totale** del sistema. La presenza di correlazione la "redistribuisce" tra le due direzioni principali, ma non la cambia.
+
+Il primo autovettore (prima colonna di `Eig.Vec`) ha componenti di segno opposto: questo identifica la direzione "\\". Il secondo autovettore è ortogonale al primo. Insieme definiscono il sistema di assi principali dell'ellisse.
+
+> **Nota concettuale**: questa è la base della **PCA**. Se ruotassi il sistema di coordinate allineandolo con gli autovettori, le due nuove componenti sarebbero **scorrelate** (la matrice di covarianza diventerebbe diagonale con elementi $\lambda_1$ e $\lambda_2$). È esattamente quello che fa la PCA: trovare le direzioni di massima varianza e proiettare i dati su di esse.
+
+---
+
+# Conclusioni — confronto Es. 7 vs Es. 8
+
+Ho confrontato due casi di normale bivariata con stesse medie e varianze ma diversa correlazione:
+
+| Aspetto | Es. 7 ($\rho = 0$) | Es. 8 ($\rho \approx -0.2$) |
+|---------|---------------------|------------------------------|
+| Scatter | Nuvola circolare | Lievemente inclinata "\\" |
+| Contour | Cerchi | Ellissi inclinate "\\" |
+| QQ-plot marginali | Normalità OK | Normalità OK (invariante) |
+| Autovalori di $\Sigma$ | Uguali (9, 9) | Diversi (12, 8) |
+| Indipendenza | Sì | No |
+
+**Lezioni operative per l'esame:**
+
+1. La forma del **contour plot** è il modo più rapido per "leggere" $\rho$ a colpo d'occhio
+2. Le **marginali** non dipendono da $\rho$ (proprietà 2): non aspettarti differenze nei QQ-plot tra casi con o senza correlazione
+3. Gli **autovalori uguali** sono firma di simmetria rotazionale (cerchi); autovalori diversi indicano direzioni privilegiate
+4. La **traccia di $\Sigma$** (somma delle varianze marginali) è invariante alla rotazione: è uno scalare che misura la dispersione totale
+
+**Prossimo passo logico**: aumentare $|\rho|$ a $0.7$–$0.9$ per vedere come le ellissi diventino sempre più schiacciate fino a degenerare in un segmento per $|\rho| = 1$. Concettualmente è interessante; per l'esame, basta capire la direzione del cambiamento.

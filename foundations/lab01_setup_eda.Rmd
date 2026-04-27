@@ -1,0 +1,380 @@
+---
+title: "Lab 01 — Setup ed Exploratory Data Analysis"
+subtitle: "Statistical Modelling — Settimana 1, Giorno 1"
+author: "Fra"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 6,
+  fig.height = 4,
+  fig.align = "center"
+)
+```
+
+# Obiettivi della sessione
+
+1. Verificare il setup R/RMarkdown/PDF
+2. Replicare l'EDA del case study "Credit rating" su dataset simulato
+3. Generare valori da distribuzioni note (normale, t-Student) e visualizzarli
+4. Costruire e interpretare un QQ-plot
+5. Interpretare un'ECDF
+
+---
+
+# Setup e librerie
+
+Carichiamo solo quello che serve oggi. Se qualche libreria ti dà errore "package not found", installala con `install.packages("nomepacchetto")` nella console R.
+
+```{r libraries}
+library(skimr)      # summary statistics descrittive
+library(ggplot2)    # grafici eleganti
+library(GGally)     # ggpairs (scatterplot matrix avanzata)
+library(MASS)       # mvrnorm (generare normale multivariata)
+```
+
+---
+
+# Case study: Credit rating (dataset simulato)
+
+## Generazione del dataset
+
+Nel lab originale del prof, i dati `ratings.Rdata` sono pre-caricati. Qui li **simuliamo noi** da una normale multivariata, riproducendo le statistiche descrittive del lab originale. Questo è anche un primo esercizio utile: vedere come si genera dati con una struttura di correlazione voluta.
+
+Le variabili sono:
+- `rating`: punteggio assegnato alle aziende dall'agenzia
+- `profit`: profittabilità
+- `capital`: struttura del capitale
+- `f_flex`: flessibilità finanziaria
+
+```{r simulate-data}
+set.seed(7369)
+n <- 30
+
+# medie target (dal lab originale)
+mu <- c(rating = 24.5, profit = 5.5, capital = 5.94, f_flex = 1.44)
+
+# deviazioni standard target
+sd_vec <- c(rating = 16.26, profit = 0.57, capital = 2.13, f_flex = 0.30)
+
+# matrice di correlazione (valori dal corrplot del lab originale)
+R <- matrix(c(
+  1.00, 0.55, 0.76, 0.70,
+  0.55, 1.00, 0.62, 0.60,
+  0.76, 0.62, 1.00, 0.65,
+  0.70, 0.60, 0.65, 1.00
+), nrow = 4, byrow = TRUE)
+
+# costruiamo Sigma (matrice var-cov) da R e dalle SD: Sigma = D R D, con D = diag(sd)
+D <- diag(sd_vec)
+Sigma <- D %*% R %*% D
+
+# generiamo n osservazioni dalla normale multivariata
+ratings <- as.data.frame(mvrnorm(n = n, mu = mu, Sigma = Sigma))
+
+# arrotondiamo per leggibilità
+ratings$rating  <- round(ratings$rating, 1)
+ratings$profit  <- round(ratings$profit, 3)
+ratings$capital <- round(ratings$capital, 3)
+ratings$f_flex  <- round(ratings$f_flex, 2)
+```
+
+**Cosa è successo qui** (concetto da capire bene):
+- `mvrnorm()` genera punti dalla normale multivariata $\mathcal{N}_p(\mu, \Sigma)$
+- Abbiamo costruito $\Sigma$ come $D \cdot R \cdot D$ dove $D$ è diagonale con le SD e $R$ è la matrice di correlazione (è la formula inversa di $R = D^{-1} \Sigma D^{-1}$)
+- Il `set.seed()` rende il risultato riproducibile
+
+## Prima ispezione dei dati
+
+```{r first-look}
+dim(ratings)        # dimensione (righe x colonne)
+str(ratings)        # struttura: tipi delle variabili
+head(ratings)       # prime 6 righe
+```
+
+**Cosa devi notare:**
+- 30 osservazioni (le aziende), 4 variabili (numeriche tutte)
+- Ogni riga = un'azienda, ogni colonna = una caratteristica
+
+## Univariate summaries con skimr
+
+```{r skim}
+skim_without_charts(ratings)
+```
+
+**Come leggere questo output:**
+- `n_missing`: quante osservazioni mancano (NA). Qui zero, perfetto
+- `mean`, `sd`: media e deviazione standard
+- `p0, p25, p50, p75, p100`: minimo, primo quartile, mediana, terzo quartile, massimo
+- Mediana (p50) ≠ media → distribuzione asimmetrica
+
+## Identificare l'azienda con rating massimo
+
+```{r max-rating}
+which.max(ratings$rating)   # indice della riga
+ratings[which.max(ratings$rating), ]   # tutta la riga
+```
+
+**Commento tipo da scrivere all'esame** (template — usalo come guida):
+> L'azienda con rating massimo presenta valori delle covariate sopra la media, suggerendo che le tre variabili esplicative sono associate positivamente al rating.
+
+## Visualizzazione: boxplot
+
+```{r boxplot-base}
+boxplot(ratings$rating,
+        xlab = "ratings",
+        horizontal = TRUE,
+        col = "lightblue",
+        main = "Box plot del rating")
+```
+
+**Anatomia del boxplot:**
+- **box**: dal 1° al 3° quartile (50% centrale dei dati)
+- **linea verticale dentro il box**: mediana
+- **whiskers (baffi)**: estendono fino a 1.5·IQR oltre i quartili
+- **punti oltre i whiskers**: potenziali outlier
+- **box asimmetrico** (parte destra più lunga): asimmetria positiva (right-skewed) — coda destra più lunga, qualche valore alto "tira" la distribuzione
+
+Versione ggplot:
+
+```{r boxplot-ggplot}
+ggplot(data = ratings) +
+  geom_boxplot(aes(y = rating), fill = "lightblue") +
+  labs(title = "Box plot del rating", y = "Rating") +
+  theme_minimal()
+```
+
+## Scatterplot
+
+Visualizza la relazione tra due variabili. La domanda è: c'è una relazione lineare? È positiva, negativa, nulla?
+
+```{r scatter}
+plot(ratings$profit, ratings$rating,
+     xlab = "Profit",
+     ylab = "Rating",
+     pch  = 16, cex = 0.8,
+     col  = "blue",
+     main = "Rating vs Profit")
+```
+
+**Cosa cercare**:
+- Andamento crescente o decrescente?
+- I punti seguono una retta o una curva?
+- Ci sono punti molto distanti dalla nuvola? (potenziali outlier)
+
+## Scatterplot matrix
+
+Per **tutte le coppie** di variabili in un colpo solo. Strumento di EDA potentissimo.
+
+```{r scatter-matrix-base}
+pairs(ratings,
+      panel = panel.smooth,
+      main  = "Scatterplot matrix")
+```
+
+La linea rossa è uno smoother (regressione locale): aiuta a vedere il **trend**, anche non lineare.
+
+Versione `GGally::ggpairs` (più informativa, mostra anche le correlazioni):
+
+```{r ggpairs}
+ggpairs(ratings)
+```
+
+**Come leggerla:**
+- **Diagonale**: distribuzione marginale di ogni variabile (densità stimata)
+- **Sotto la diagonale**: scatterplot di ogni coppia
+- **Sopra la diagonale**: coefficiente di correlazione, con asterischi che indicano la significatività
+
+**Cosa concludere su questo dataset** (da scrivere come commento):
+- Tutte le correlazioni sono positive e moderate-alte (0.55 - 0.76)
+- La correlazione più forte è tra `rating` e `capital` (~0.76)
+- Le covariate sono correlate anche tra loro: questo è un primo segnale di possibile **multicollinearità** (ne riparleremo)
+
+---
+
+# Generare valori da distribuzioni note
+
+## Normale standard
+
+R fornisce per ogni distribuzione 4 funzioni:
+
+| Prefisso | Cosa fa |
+|----------|---------|
+| `d`      | densità (pdf) in un punto |
+| `p`      | probabilità cumulata $P(X \le x)$ (cdf) |
+| `q`      | quantile inverso (inversa della cdf) |
+| `r`      | genera valori casuali |
+
+Per la normale: `dnorm`, `pnorm`, `qnorm`, `rnorm`.
+
+```{r normal-sim}
+set.seed(7369)
+n     <- 1000
+mu    <- 0
+sigma <- 1
+
+z <- rnorm(n, mean = mu, sd = sigma)
+
+# statistiche del campione simulato
+summary(z)
+sd(z)
+```
+
+**Da notare:** media e SD del campione sono *vicine* ma non esattamente uguali ai valori teorici (0 e 1) — è la variabilità campionaria. Con `n` più grande si avvicinerebbero ancora di più.
+
+## Trasformazione lineare → normale generale
+
+Se $Z \sim \mathcal{N}(0, 1)$, allora $Y = \mu + \sigma Z \sim \mathcal{N}(\mu, \sigma^2)$.
+
+```{r linear-transform}
+y  <- 140 + 6  * z   # Y ~ N(140, 36)
+y1 <- 140 + 10 * z   # Y1 ~ N(140, 100)
+
+c(mean = mean(y),  sd = sd(y))
+c(mean = mean(y1), sd = sd(y1))
+```
+
+## Visualizzazione con istogramma
+
+```{r hist-y}
+hist(y,
+     breaks = 50,
+     main   = "Realizzazioni da Y ~ N(140, 36)",
+     prob   = TRUE,           # densità invece di frequenze assolute
+     ylab   = "Densità",
+     col    = "yellow1")
+```
+
+Confronto delle due distribuzioni con varianze diverse:
+
+```{r hist-compare, fig.width=8, fig.height=4}
+par(mfrow = c(1, 2))   # 1 riga, 2 colonne di plot
+
+hist(y,  breaks = 50, prob = TRUE,
+     ylim = c(0, 0.08), xlim = c(100, 190),
+     col  = "yellow1",
+     main = "Y ~ N(140, 36)", ylab = "Densità")
+
+hist(y1, breaks = 50, prob = TRUE,
+     ylim = c(0, 0.08), xlim = c(100, 190),
+     col  = "springgreen2",
+     main = "Y1 ~ N(140, 100)", ylab = "Densità")
+
+par(mfrow = c(1, 1))   # ripristino il default
+```
+
+**Cosa devi vedere:** la seconda distribuzione (verde) è più larga e bassa — varianza maggiore = più dispersione attorno alla media.
+
+## ECDF (empirical cumulative distribution function)
+
+```{r ecdf-plot}
+plot(ecdf(y),  main = "ECDF a confronto", xlab = "x", ylab = expression(F[n](x)))
+plot(ecdf(y1), add  = TRUE, col = "red")
+legend("topleft",
+       legend = c("N(140, 36)", "N(140, 100)"),
+       lty    = c(1, 1),
+       lwd    = c(2, 2),
+       col    = c("black", "red"),
+       cex    = 0.8)
+```
+
+**Come leggere l'ECDF:**
+- È una **funzione a gradini**: ogni gradino corrisponde a un'osservazione del campione
+- Sull'asse y: la frazione di dati ≤ x
+- Inizia da 0, finisce a 1
+- **Curva più ripida** = distribuzione più concentrata (varianza minore). Vedi che la nera (N(140,36)) sale più ripidamente al centro
+
+## Probabilità e quantili
+
+`pnorm` calcola la probabilità cumulata, `qnorm` il quantile (inverso della cdf):
+
+```{r prob-quantile}
+# P(Y <= 130) per Y ~ N(140, 6^2)
+round(pnorm(130, mean = 140, sd = 6), 4)
+
+# il 97.5° percentile della stessa distribuzione
+round(qnorm(0.975, mean = 140, sd = 6), 4)
+```
+
+**Interpretazione:**
+- Solo il 4.78% dei valori di Y sta sotto 130
+- Il 97.5% dei valori sta sotto 151.76 (utile per costruire intervalli di confidenza al 95%)
+
+---
+
+# QQ-plot: confrontare con la normale teorica
+
+Generiamo due campioni: uno da una normale standard, uno da una t-Student con 3 gradi di libertà.
+
+```{r qqplot-compare, fig.width=8, fig.height=4}
+set.seed(123)
+Y1 <- rnorm(1000)             # normale standard
+
+set.seed(234)
+Y2 <- rt(1000, df = 3)        # t-Student con 3 df (code molto pesanti)
+
+par(mfrow = c(1, 2))
+
+qqnorm(Y1, col = "blue", main = "Y1 ~ N(0,1)")
+qqline(Y1)                    # retta di riferimento
+
+qqnorm(Y2, col = "blue", main = "Y2 ~ t(3)")
+qqline(Y2)
+
+par(mfrow = c(1, 1))
+```
+
+**Come si interpreta** (questo è cruciale per la diagnostica della regressione):
+
+- **Y1 (normale standard)**: i punti seguono la retta — confermano la normalità
+- **Y2 (t con df=3)**: i punti **deviano** alle estremità: si curvano verso l'alto a destra e verso il basso a sinistra → **code più pesanti** della normale (più valori estremi del previsto)
+
+**Pattern tipici da riconoscere a colpo d'occhio:**
+
+| Pattern del QQ-plot | Diagnosi |
+|---------------------|----------|
+| Punti sulla retta | Distribuzione normale ✓ |
+| Curva a "S" (estremi che salgono/scendono lontano dalla retta) | Code pesanti |
+| Concavità verso l'alto su tutto il range | Asimmetria positiva |
+| Concavità verso il basso | Asimmetria negativa |
+| Punti isolati lontano dalla retta agli estremi | Outlier |
+
+---
+
+# Cosa portiamo nel cheat-sheet
+
+Da questa sessione, le sezioni del cheat-sheet che possiamo iniziare a riempire sono:
+
+- **Sezione 0 (Setup)**: header YAML, librerie standard, snippet `read.csv`/`load`
+- **Sezione 1.1 (Distribuzioni e VA)**:
+  - Le 4 funzioni R (`d`, `p`, `q`, `r`) per ogni distribuzione
+  - `rnorm`, `rt`, trasformazione lineare
+  - Istogramma con `hist(..., prob=TRUE)`
+  - ECDF con `plot(ecdf(...))`
+  - QQ-plot con `qqnorm` + `qqline` e tabella interpretazione
+
+Useremo le sezioni "Misure di associazione" (sezione 2 del cheat-sheet) domani con la correlazione parziale.
+
+---
+
+# Conclusioni della sessione
+
+Hai visto:
+1. ✓ Setup completo del progetto e knit funzionante
+2. ✓ EDA su dataset multivariato (skim, boxplot, scatterplot, scatterplot matrix)
+3. ✓ Generazione da distribuzioni note (normale, t-Student)
+4. ✓ Trasformazioni lineari → normale generale
+5. ✓ ECDF per visualizzare la distribuzione empirica
+6. ✓ QQ-plot per confronto con distribuzione teorica

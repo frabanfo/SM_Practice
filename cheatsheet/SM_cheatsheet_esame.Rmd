@@ -39,60 +39,503 @@ library(car)        # vif, diagnostica
 library(corrplot)   # visualizzazione matrici di correlazione
 library(boot)       # bootstrap
 library(ppcor)      # correlazioni parziali
+library(GGally) 
+library(mvtnorm)
+library(ggplot2)
+library(skimr)
 ```
 
 ## Import dati tipico
 
 ```{r import-template, eval=FALSE}
 # Da CSV
-df <- read.csv("percorso/al/file.csv", header = TRUE, stringsAsFactors = TRUE)
+df <- read.csv("path/to/file.csv", header = TRUE, stringsAsFactors = TRUE)
+
+# Da .RData (file workspace R, contiene già oggetti nominati)
+load("path/to/file.RData")
+# dopo load() gli oggetti sono già disponibili con i loro nomi originali
+
+# Da .txt con separatore tab o spazio
+df <- read.table("path/to/file.txt", header = TRUE, sep = "\t")
+```
 
 # Prima ispezione
 str(df)
 summary(df)
 head(df)
 dim(df)
+
+#summary più completo
+skimr::skim_without_charts(df)
+
+```
+### Cosa controllare
+
+- **n_missing**: ci sono NA? Se sì, decidere se rimuoverli (`na.omit(df)`) o gestirli
+- **Tipi delle variabili**: numeric, factor, integer? Una variabile categorica letta come numerica va convertita con `as.factor()`
+- **Range di variazione**: scale molto diverse possono suggerire la necessità di standardizzare
+- **Mediana vs media**: se molto diverse → distribuzione asimmetrica
+
+### Conversione di tipo (frequente)
+
+```{r type-conversion, eval=FALSE}
+df$variabile_cat <- as.factor(df$variabile_cat)    # numerica → categorica
+df$variabile_num <- as.numeric(df$variabile_num)   # carattere → numerica
+levels(df$variabile_cat)                           # mostra i livelli del factor
+```
+---
+
+# Distribuzioni e Variabili Casuali
+
+## Distribuzioni e variabili casuali
+
+### Le 4 funzioni R per ogni distribuzione
+
+Per ogni distribuzione, R fornisce 4 funzioni con prefisso fisso:
+
+| Prefisso | Cosa fa | Input → Output |
+|----------|---------|----------------|
+| `d` | densità (pdf) o massa (pmf) in un punto | $x$ → $f(x)$ |
+| `p` | probabilità cumulata $P(X \le x)$ | $x$ → $F(x)$ |
+| `q` | quantile (inverso di p) | $p \in [0,1]$ → $x$ tale che $F(x) = p$ |
+| `r` | genera $n$ valori casuali | $n$ → vettore di realizzazioni |
+
+Distribuzioni rilevanti per il corso:
+
+| Distribuzione | Suffisso | Parametri |
+|---------------|----------|-----------|
+| Normale | `norm` | `mean`, `sd` |
+| Student-t | `t` | `df` |
+| Chi-quadro | `chisq` | `df` |
+| F di Fisher | `f` | `df1`, `df2` |
+| Binomiale | `binom` | `size`, `prob` |
+
+Esempi:
+
+```{r dist-functions, eval=FALSE}
+# NORMALE N(140, 6^2)
+dnorm(135, mean = 140, sd = 6)        # densità f(135)
+pnorm(130, mean = 140, sd = 6)        # P(X <= 130) ≈ 0.0478
+qnorm(0.975, mean = 140, sd = 6)      # 97.5-esimo percentile ≈ 151.76
+rnorm(1000, mean = 140, sd = 6)       # 1000 realizzazioni
+
+# STUDENT-T con 10 df
+qt(0.975, df = 10)                     # 97.5-esimo percentile (uso tipico: CI)
+pt(2.5, df = 10)                       # P(T <= 2.5)
+
+# Quantili tipici per intervalli di confidenza:
+qnorm(0.975)                           # ≈ 1.96, per CI al 95% con sigma noto
+qt(0.975, df = n - 1)                  # per CI al 95% con sigma stimato
 ```
 
+**Template di commento (uso tipico nei test/CI):**
+> Il quantile teorico al 97.5% per la distribuzione [normale/t con `df` gradi di libertà] è `[valore]`. Lo uso per costruire un intervallo di confidenza al 95% per `[parametro]`.
+
+### Generare campioni e trasformazioni lineari
+
+```{r generate-samples, eval=FALSE}
+# Riproducibilità: SEMPRE prima di rnorm/rt/sample/...
+set.seed(7369)
+
+# 1000 valori da N(0, 1)
+z <- rnorm(1000, mean = 0, sd = 1)
+
+# trasformazione lineare: Y = mu + sigma * Z  ⇒  Y ~ N(mu, sigma^2)
+y <- 140 + 6 * z          # equivalente a rnorm(1000, 140, 6)
+
+# campione da una t-Student con 3 df (code pesanti)
+t_vals <- rt(1000, df = 3)
+```
+
+**Concetto chiave**: una normale generale $\mathcal{N}(\mu, \sigma^2)$ si ottiene **standardizzando alla rovescia** una standard $\mathcal{N}(0,1)$:
+$$Y = \mu + \sigma Z$$
+
+E viceversa, per **standardizzare**:
+$$Z = \frac{Y - \mu}{\sigma} \sim \mathcal{N}(0, 1)$$
+
+```{r standardize, eval=FALSE}
+# standardizzare un vettore osservato
+z_std <- (y - mean(y)) / sd(y)         # standardizzazione campionaria
+# oppure:
+z_std <- scale(y)                       # funzione R built-in
+```
+
+**Quando standardizzare:**
+- Per confrontare variabili su scale diverse
+- Prima di alcune procedure (es. clustering, PCA)
+- Per calcolare quantili teorici
+
+**Note sul `set.seed()`:**
+- Va messo **subito prima** di ogni funzione che genera casualità
+- Stessa seed → stessi numeri casuali → risultati riproducibili
+- Cambiare seed cambia il campione, ma non le proprietà generali del campione (per `n` grande)
+
+### Visualizzazione: istogramma e ECDF
+
+#### Istogramma
+
+```{r hist, eval=FALSE}
+hist(y,
+     breaks = 50,                     # numero di classi (default: regola di Sturges)
+     prob   = TRUE,                   # densità invece di frequenze assolute
+     main   = "Realizzazioni da Y ~ N(mu, sigma^2)",
+     xlab   = "y",
+     ylab   = "Densità",
+     col    = "lightblue")
+```
+
+**Cosa cercare:**
+
+- **Forma**: campanulare (normale) / asimmetrica / multimodale?
+- **Centro**: dove si trova il picco?
+- **Dispersione**: distribuzione larga o concentrata?
+
+#### Confronto di due distribuzioni
+
+```{r hist-compare, eval=FALSE}
+par(mfrow = c(1, 2))                  # 1 riga, 2 colonne di plot
+
+hist(y,  breaks = 50, prob = TRUE,
+     ylim = c(0, 0.08), xlim = c(100, 190),
+     col  = "yellow1",
+     main = "Y ~ N(140, 36)", ylab = "Densità")
+
+hist(y1, breaks = 50, prob = TRUE,
+     ylim = c(0, 0.08), xlim = c(100, 190),
+     col  = "springgreen2",
+     main = "Y1 ~ N(140, 100)", ylab = "Densità")
+
+par(mfrow = c(1, 1))                  # ripristina il default
+```
+
+> **Trucco**: per confrontare distribuzioni serve **fissare gli stessi `xlim` e `ylim`** in entrambi gli istogrammi, altrimenti l'occhio inganna.
+
+#### ECDF (empirical cumulative distribution function)
+
+Stima non parametrica della cdf vera, basata sulla frazione di dati $\le x$.
+
+```{r ecdf, eval=FALSE}
+plot(ecdf(y),
+     main = "ECDF a confronto",
+     xlab = "x",
+     ylab = expression(F[n](x)))
+plot(ecdf(y1), add = TRUE, col = "red")
+legend("topleft",
+       legend = c("N(140, 36)", "N(140, 100)"),
+       lty = c(1, 1), lwd = c(2, 2),
+       col = c("black", "red"),
+       cex = 0.8)
+```
+
+**Come si legge:**
+
+- Funzione a gradini, ogni gradino = un'osservazione
+- Asse y: frazione di dati $\le x$. Va da 0 a 1
+- **Curva più ripida al centro** = distribuzione più concentrata (varianza minore)
+- **Curva più dolce** = distribuzione più dispersa
+
+**Template di commento:**
+
+> L'ECDF della variabile `[nome]` mostra una distribuzione [concentrata / dispersa] attorno al valore `[mediana]`, con [pochi / molti] valori estremi nelle code.
+
 ---
 
-# 1. Distribuzioni e Variabili Casuali
+### QQ-plot
 
-## 1.1 Generare campioni, QQ-plot, ECDF
+Confronto visivo tra distribuzione empirica e teorica (di solito normale). È lo strumento principe per la diagnostica della normalità — userai questo per i residui della regressione.
 
-<!-- Giorno 1: inserire qui codice + commenti template -->
+#### Costruzione
 
-## 1.2 Normale bivariata e multivariata
+```{r qqplot, eval=FALSE}
+qqnorm(y, col = "blue", main = "QQ-plot di y vs Normale")
+qqline(y)                              # retta di riferimento
+```
 
-<!-- Giorno 2: inserire qui codice + commenti template -->
+#### Confronto: normale vs t con code pesanti
 
+```{r qqplot-compare, eval=FALSE}
+set.seed(123)
+Y1 <- rnorm(1000)                      # normale standard
+set.seed(234)
+Y2 <- rt(1000, df = 3)                 # t-Student con 3 df
+
+par(mfrow = c(1, 2))
+qqnorm(Y1, col = "blue", main = "Y1 ~ N(0,1)"); qqline(Y1)
+qqnorm(Y2, col = "blue", main = "Y2 ~ t(3)");   qqline(Y2)
+par(mfrow = c(1, 1))
+```
+
+#### Tabella di interpretazione (cruciale)
+
+| Pattern del QQ-plot | Diagnosi |
+|---------------------|----------|
+| Punti allineati sulla retta | Distribuzione **normale** ✓ |
+| Curva a "S" con estremi che salgono/scendono lontano dalla retta | **Code pesanti** (più valori estremi del previsto) |
+| Concavità verso l'alto su tutto il range | **Asimmetria positiva** (coda destra lunga) |
+| Concavità verso il basso | **Asimmetria negativa** (coda sinistra lunga) |
+| Pochi punti isolati lontano dalla retta agli estremi | **Outlier** |
+
+**Template di commento (esame):**
+
+> Il QQ-plot dei [residui / valori] mostra punti [allineati sulla retta / che deviano dalla retta agli estremi]. Concludo che la distribuzione [è / non è] approssimativamente normale, [con code più pesanti / con asimmetria positiva / ...].
+
+> Specificamente, la presenza di [pattern osservato] suggerisce che [diagnosi]. Questo [conferma / viola] l'assunzione di normalità necessaria per [contesto: regressione, test, ...].
+
+#### Test formali di normalità (alternativa al QQ-plot)
+
+```{r normality-tests, eval=FALSE}
+shapiro.test(y)                        # test di Shapiro-Wilk (n piccolo, n < 5000)
+# H0: i dati provengono da una normale
+# p-value piccolo → rifiuto la normalità
+```
+
+> **Attenzione**: con `n` molto grande, anche piccole deviazioni dalla normalità portano a rifiutare H0. Il QQ-plot rimane più informativo del test in molti casi pratici.
+
+## Normale bivariata e multivariata
+Normale bivariata e multivariata
+ 
+### Generazione di realizzazioni
+ 
+```{r mvnorm-generate, eval=FALSE}
+library(mvtnorm)
+ 
+set.seed(625)
+ 
+# vettore delle medie
+mu <- c(0, 0)
+ 
+# matrice di varianza-covarianza
+# diagonale = varianze (sigma^2), fuori diagonale = covarianze
+sigma <- matrix(c(9, 2,
+                  2, 9), ncol = 2)
+ 
+# generazione
+X <- rmvnorm(n = 3000, mean = mu, sigma = sigma)
+# X è una matrice n × 2: una riga per realizzazione, una colonna per componente
+```
+ 
+> **Attenzione alla parametrizzazione**: nella matrice `sigma` la diagonale contiene le **varianze**, non le deviazioni standard. Se ti viene dato $\sigma = 3$, devi inserire $\sigma^2 = 9$ in `sigma`.
+ 
+### Costruzione di Sigma a partire da SD e correlazione
+ 
+Quando ti vengono dati SD e correlazioni invece di varianze e covarianze:
+ 
+```{r sigma-from-corr, eval=FALSE}
+sd_vec <- c(3, 3)              # deviazioni standard
+R <- matrix(c(1.0, 0.7,        # matrice di correlazione
+              0.7, 1.0), ncol = 2)
+ 
+D <- diag(sd_vec)
+sigma <- D %*% R %*% D         # Sigma = D R D
+```
+ 
+### Densità teorica e plot 3D
+ 
+```{r density-3d, eval=FALSE}
+library(scatterplot3d)
+ 
+z1 <- seq(min(X[, 1]), max(X[, 1]), length.out = 50)
+z2 <- seq(min(X[, 2]), max(X[, 2]), length.out = 50)
+grid <- expand.grid(z1, z2)
+dens <- matrix(dmvnorm(grid, mean = mu, sigma = sigma),
+               ncol = length(z1), byrow = TRUE)
+ 
+plot3d <- scatterplot3d(z1, z2,
+                        seq(min(dens), max(dens), length.out = length(z1)),
+                        type = "n", angle = 70, grid = FALSE,
+                        main = "Densità teorica bivariata",
+                        xlab = expression(X[1]), ylab = expression(X[2]),
+                        zlab = "f(X1, X2)")
+ 
+for (i in length(z1):1) {
+  plot3d$points3d(rep(z1[i], length(z2)), z2, dens[i, ],
+                  type = "l", col = "darkorange")
+}
+for (i in length(z2):1) {
+  plot3d$points3d(z1, rep(z2[i], length(z1)), dens[, i],
+                  type = "l", col = "darkorange")
+}
+```
+ 
+### Contour plot (ellissi di isodensità)
+ 
+```{r contour, eval=FALSE}
+z1 <- seq(-10, 10, length.out = 300)
+z2 <- seq(-10, 10, length.out = 300)
+grid <- expand.grid(z1, z2)
+dens <- matrix(dmvnorm(grid, mean = mu, sigma = sigma), ncol = length(z1))
+ 
+contour(z1, z2, dens,
+        col = "blue",
+        main = "Contour plot",
+        xlab = expression(X[1]), ylab = expression(X[2]),
+        asp = 1)                     # asp=1 mantiene le proporzioni!
+```
+ 
+### Tabella di interpretazione delle ellissi
+ 
+| Forma osservata | Diagnosi |
+|-----------------|----------|
+| Cerchio perfetto | $\rho = 0$ **e** $\sigma_{X_1} = \sigma_{X_2}$ |
+| Ellisse con assi orizzontale/verticale | $\rho = 0$, $\sigma_{X_1} \neq \sigma_{X_2}$ |
+| Ellisse inclinata "/" | $\rho > 0$ |
+| Ellisse inclinata "\\" | $\rho < 0$ |
+| Ellisse molto schiacciata | $|\rho|$ vicino a 1 |
+ 
+### Decomposizione spettrale di $\Sigma$
+ 
+```{r spectral, eval=FALSE}
+eig <- eigen(sigma)
+eig$values        # autovalori = varianze lungo gli assi principali
+eig$vectors       # autovettori = direzioni degli assi principali
+ 
+# verifica della decomposizione: Sigma = Q Lambda Q^T
+eig$vectors %*% diag(eig$values) %*% t(eig$vectors)
+```
+ 
+**Template di commento (uso tipico):**
+ 
+> Il contour plot mostra ellissi [circolari / inclinate / schiacciate], coerenti con [valori dei parametri della distribuzione]. La forma [è / non è] coerente con quella attesa sotto l'ipotesi di normalità bivariata: in particolare, [forma osservata] suggerisce che $\rho$ è [vicino a zero / positivo / negativo] e che le varianze [sono / non sono] dello stesso ordine di grandezza.
+
+### Proprietà chiave (mappe mentali per il commento)
+
+- **Marginali**: di una bivariata normale sono univariate normali. Verificale con `qqnorm()` su ciascuna colonna.
+- **Indipendenza** equivale a ρ = 0 **solo per la normale** (non vale in generale).
+- **Media condizionata**: E(Y|X=x) è lineare in x. È il fondamento della regressione lineare.
+- **Varianza condizionata**: Var(Y|X=x) = σ²_Y · (1 - ρ²). Conoscere X riduce l'incertezza su Y di un fattore (1 - ρ²).
 ---
+ 
+## Misure di associazione
+ 
+### Covarianza e correlazione
+ 
+```{r cov-cor, eval=FALSE}
+# tra due variabili
+cov(df$x, df$y)
+cor(df$x, df$y)
+ 
+# matrice di var-cov e di correlazione (per più variabili)
+cov(df)
+cor(df)
+round(cor(df), 2)              # arrotondata per leggibilità
+```
+ 
+**Differenza pratica:**
+ 
+- `cov` dipende dalle unità di misura → leggibile solo se confronti con SD
+- `cor` è in $[-1, 1]$ → leggibile direttamente
+**Soglie indicative per $|\rho|$:**
+ 
+| $|\rho|$ | Forza |
+|----------|-------|
+| < 0.2 | Debole |
+| 0.2 – 0.5 | Moderata |
+| 0.5 – 0.7 | Significativa |
+| 0.7 – 0.9 | Forte |
+| > 0.9 | Molto forte (attenzione a multicollinearità) |
+ 
+### Correlazione parziale
+ 
+Risolve il problema dei **confondenti**: misura l'associazione tra X e Y al netto di Z.
+ 
+```{r partial-cor, eval=FALSE}
+library(ppcor)
+ 
+# correlazione parziale tra due variabili al netto di tutte le altre
+pcor(df)$estimate              # matrice delle correlazioni parziali
+pcor(df)$p.value               # p-value associati
+ 
+# tra coppia specifica al netto di una variabile specifica
+pcor.test(x = df$x, y = df$y, z = df$z)
+```
+ 
+**Interpretazione (i 3 casi tipici):**
+ 
+| $r_{xy}$ | $r_{xy \cdot z}$ | Diagnosi |
+|----------|------------------|----------|
+| Alta | Vicina a 0 | **Correlazione spuria**: l'associazione era spiegata da Z |
+| Alta | Ancora alta | **Associazione genuina**: persiste anche al netto di Z |
+| Vicina a 0 | Alta | **Paradosso di Simpson**: Z mascherava un'associazione reale |
+ 
+**Template di commento:**
+ 
+> La correlazione marginale tra `[X]` e `[Y]` è pari a `[valore]`, mentre la correlazione parziale al netto di `[Z]` è `[valore]`. La [riduzione / persistenza / inversione] suggerisce che [l'associazione è spiegata da Z / l'associazione è genuina / Z mascherava la relazione].
+ 
+### Scatterplot e scatterplot matrix
+ 
+```{r scatter-base, eval=FALSE}
+# scatterplot bivariato
+plot(df$x, df$y,
+     pch = 16, cex = 0.8, col = "blue",
+     main = "Y vs X",
+     xlab = "X", ylab = "Y")
+abline(lm(y ~ x, data = df), col = "red")    # retta di regressione opzionale
+ 
+# scatterplot matrix (base)
+pairs(df, panel = panel.smooth, main = "Scatterplot matrix")
+ 
+# versione informativa con GGally
+library(GGally)
+ggpairs(df)
+# diagonale: densità marginali
+# sotto diagonale: scatterplot
+# sopra diagonale: correlazioni con livelli di significatività
+```
+ 
+### Visualizzazione matrici di correlazione: corrplot
+ 
+```{r corrplot, eval=FALSE}
+library(corrplot)
+ 
+# correlazioni grezze
+corrplot(cor(df),
+         type = "upper",                   # solo triangolo superiore
+         method = "circle",                # circle / square / number / color
+         tl.col = "black",                 # colore etichette
+         tl.cex = 0.8)                     # dimensione etichette
+ 
+# correlazioni parziali
+corrplot(pcor(df)$estimate,
+         type = "upper",
+         method = "circle",
+         tl.col = "black")
+ 
+# affiancate per confronto visivo
+par(mfrow = c(1, 2))
+corrplot(cor(df), type = "upper", method = "circle", title = "Raw")
+corrplot(pcor(df)$estimate, type = "upper", method = "circle", title = "Partial")
+par(mfrow = c(1, 1))
+```
+ 
+> **Trucco**: `corrplot` affiancati di correlazioni *raw* vs *partial* è il modo più rapido per individuare confondenti e relazioni spurie a colpo d'occhio.
+ 
+### Trappole comuni nelle misure di associazione
+ 
+- **$\rho = 0$ non implica indipendenza** (tranne sotto normalità bivariata). Esempio classico: $Y = X^2$ con $X$ simmetrica → $\rho = 0$ ma forte dipendenza
+- **Correlazione lineare** è cieca alle relazioni non lineari → guarda sempre lo scatterplot prima di fidarti di $\rho$
+- **Correlazione $\neq$ causazione** (esempio gelati-annegamenti) → la correlazione parziale aiuta a capire se l'associazione è genuina, ma non basta da sola per stabilire causalità (servirebbe un esperimento randomizzato)
+- **Multicollinearità**: se $|\rho| > 0.9$ tra due covariate, la regressione successiva avrà problemi (lo affronteremo con VIF)
 
-# 2. Misure di Associazione
 
-<!-- Giorno 2: correlazioni, correlazioni parziali, corrplot -->
+# Inferenza
 
----
-
-# 3. Inferenza
-
-## 3.1 Maximum Likelihood Estimation
+## Maximum Likelihood Estimation
 
 <!-- Giorno 3: template log-likelihood + optim -->
 
-## 3.2 Bootstrap e intervalli di confidenza
+## Bootstrap e intervalli di confidenza
 
 <!-- Giorno 4: bootstrap manuale + libreria boot + percentile CI -->
 
 ---
 
-# 4. Regressione Lineare Multipla
+# Regressione Lineare Multipla
 
-## 4.1 Fit del modello e lettura del summary
+## Fit del modello e lettura del summary
 
 <!-- Giorno 6-7: lm(), summary, coefficienti, R^2 -->
 
-## 4.2 Diagnostica (residui, leverage, Cook, VIF)
+## Diagnostica (residui, leverage, Cook, VIF)
 
 <!-- Giorno 8, 10: diagnostic plots, hatvalues, cooks.distance, vif -->
 
@@ -105,41 +548,41 @@ dim(df)
 | Punto influente | distanza di Cook | > 1 (o > 4/n) |
 | Multicollinearità | VIF | > 5 (attenzione), > 10 (serio) |
 
-## 4.3 Inferenza: F-test, t-test, intervalli di confidenza
+## Inferenza: F-test, t-test, intervalli di confidenza
 
 <!-- Giorno 9: anova, confint, interpretazione -->
 
-## 4.4 Variabili categoriche e interazioni
+## Variabili categoriche e interazioni
 
 <!-- Giorno 12: dummy, relevel, interpretazione coefficienti, interazioni -->
 
-## 4.5 Selezione del modello
+## Selezione del modello
 
 <!-- Giorno 11: step, stepAIC, AIC vs BIC -->
 
-## 4.6 Predizione (CI vs PI)
+## Predizione (CI vs PI)
 
 <!-- Giorno 11: predict con interval="confidence" vs "prediction" -->
 
 ---
 
-# 5. Regressione Logistica
+# Regressione Logistica
 
-## 5.1 Fit con glm e lettura del summary
+## Fit con glm e lettura del summary
 
 <!-- Giorno 13-14: glm(family=binomial) -->
 
-## 5.2 Odds ratio e interpretazione
+## Odds ratio e interpretazione
 
 <!-- Giorno 13: exp(coef), exp(confint), template commento -->
 
-## 5.3 Selezione del modello e predizione
+## Selezione del modello e predizione
 
 <!-- Giorno 14: step su glm, predict type="response" -->
 
 ---
 
-# 6. Flowchart Decisionale
+# Flowchart Decisionale
 
 <!-- Giorno 15: guida "dato un problema X, quali passi?" -->
 
@@ -158,7 +601,7 @@ dim(df)
 
 ---
 
-# 7. Trappole Comuni
+# Trappole Comuni
 
 <!-- Annotare qui errori frequenti durante lo studio -->
 
