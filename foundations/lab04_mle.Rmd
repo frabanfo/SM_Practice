@@ -1,0 +1,316 @@
+---
+title: "Lab 04 — Maximum Likelihood Estimation"
+subtitle: "Statistical Modelling — Settimana 1, Giorno 3"
+author: "Fra"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+  pdf_document:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 6,
+  fig.height = 4,
+  fig.align = "center"
+)
+```
+
+# Obiettivi della sessione
+
+1. Replicare l'**Example of likelihood function** dalle Applications (caso Bernoulli con $n=3$)
+2. Costruire likelihood e log-likelihood manualmente
+3. Trovare il MLE per **griglia** (ricerca esaustiva) e con **`optim()`** (ottimizzazione numerica)
+4. Estensione: confronto al variare di $n$ (concentrazione della log-likelihood)
+5. Secondo esempio: MLE per la media di una Gaussiana
+
+---
+
+# 1. Esempio del prof: Bernoulli con n = 3
+
+## 1.1 Il problema
+
+Hai 3 osservazioni di una variabile binaria (es. asset finanziario con rendimento $\geq 3\%$ = successo, altrimenti fallimento):
+
+$$x_1 = 1, \quad x_2 = 0, \quad x_3 = 1$$
+
+Modello: $X_i \sim \text{Bernoulli}(p)$ iid. Vuoi stimare $p$.
+
+## 1.2 Stima MLE analitica
+
+Per la Bernoulli, sappiamo dalla teoria:
+$$\hat p_{ML} = \frac{1}{n}\sum_i x_i = \bar x$$
+
+```{r p-hat-analytical}
+x <- c(1, 0, 1)
+
+p_hat <- mean(x)
+p_hat
+```
+
+Risultato: $\hat p_{ML} = 2/3 \approx 0.667$.
+
+## 1.3 Verifica numerica via griglia (likelihood)
+
+Costruiamo la funzione di verosimiglianza e la valutiamo su una griglia di valori di $p$.
+
+Per dati Bernoulli iid: $L(p) = \prod_i p^{x_i}(1-p)^{1-x_i}$. Per il nostro campione: $L(p) = p \cdot (1-p) \cdot p = p^2(1-p)$.
+
+```{r likelihood-grid}
+# funzione likelihood per Bernoulli
+likelihood <- function(p, data) {
+  prod(p^data * (1 - p)^(1 - data))
+}
+
+# griglia di valori di p
+p_vals <- seq(0.01, 0.99, length.out = 100)
+
+# valuto la likelihood su ogni valore della griglia
+lik_vals <- sapply(p_vals, likelihood, data = x)
+
+# trovo il valore della griglia che massimizza
+p_mle_numeric <- p_vals[which.max(lik_vals)]
+p_mle_numeric
+```
+
+**Commento.**
+
+Il valore numerico ottenuto via griglia ($\approx 0.663$) è molto vicino al valore analitico ($\hat p_{ML} = 0.667$). La piccola differenza è dovuta alla **discretizzazione**: la griglia ha solo 100 valori tra 0.01 e 0.99, quindi il massimo trovato è il valore della griglia più vicino al vero massimo. Aumentando la risoluzione, la stima numerica converge a quella analitica.
+
+## 1.4 Stessa cosa con la log-likelihood
+
+In pratica si usa **sempre** la log-likelihood:
+
+- numericamente più stabile (somme invece di prodotti)
+- più facile da derivare
+- il punto di massimo è lo stesso (logaritmo è monotono crescente)
+
+$\ell(p) = \log L(p) = \sum_i [x_i \log p + (1 - x_i) \log(1 - p)]$
+
+```{r loglik-grid}
+logLik <- function(p, data) {
+  sum(data * log(p) + (1 - data) * log(1 - p))
+}
+
+loglik_vals <- sapply(p_vals, logLik, data = x)
+
+p_mle_log <- p_vals[which.max(loglik_vals)]
+p_mle_log
+```
+
+Stesso risultato. Confermato.
+
+## 1.5 Visualizzazione
+
+```{r plot-loglik}
+plot(p_vals, loglik_vals,
+     type = "l",
+     lwd = 2, col = "blue",
+     main = "Log-likelihood Bernoulli (n = 3)",
+     xlab = "p",
+     ylab = expression(log~L(p)))
+
+abline(v = p_hat, col = "red", lty = 2, lwd = 2)
+
+text(p_hat + 0.05, min(loglik_vals) + 1,
+     labels = paste("p_hat =", round(p_hat, 3)),
+     col = "red")
+```
+
+**Commento.**
+
+La log-likelihood ha un andamento concavo con un **unico massimo interno** in $p = 2/3$. Si avvicina a $-\infty$ quando $p \to 0$ o $p \to 1$ — il che ha senso: quei valori estremi sono incompatibili con i dati osservati ($x_2 = 0$ esclude $p = 1$, mentre $x_1 = x_3 = 1$ rendono molto improbabile $p = 0$).
+
+La curva è **piuttosto piatta attorno al massimo**: questo riflette il fatto che, con solo $n = 3$ osservazioni, non c'è abbastanza informazione per discriminare nettamente tra valori vicini di $p$. Vedremo nel paragrafo 3 come la curvatura cambia al variare di $n$.
+
+---
+
+# 2. Stessa stima con `optim()` — ottimizzazione numerica
+
+In casi più complessi (parametri multipli, distribuzioni senza formula chiusa per la MLE) si usa **`optim()`** invece della ricerca su griglia.
+
+```{r optim-mle}
+# funzione da MINIMIZZARE: la negativa della log-likelihood
+# (optim cerca il minimo per default)
+neg_logLik <- function(p, data) {
+  -logLik(p, data)
+}
+
+# ottimizzazione numerica
+result <- optim(par = 0.5,                  # valore iniziale
+                fn  = neg_logLik,           # funzione da minimizzare
+                data = x,
+                method = "Brent",           # adatto per parametri scalari
+                lower = 0.001, upper = 0.999)
+
+result$par                                  # stima MLE numerica
+```
+
+**Commento.**
+
+`optim()` con metodo Brent (adatto a parametri scalari con vincoli) restituisce $\hat p \approx 0.6666$, in pieno accordo con la stima analitica. È lo strumento di riferimento quando non hai una formula chiusa.
+
+> **Convenzione**: `optim()` minimizza per default. Per cercare un massimo si **minimizza la funzione negata** ($-\ell(p)$). Da qui il `-logLik(p, data)` nella funzione `neg_logLik`.
+
+> **Scelta del metodo**: per problemi 1-D usa `method = "Brent"` con `lower` e `upper` espliciti. Per problemi multidimensionali, il default `"Nelder-Mead"` o `"BFGS"` (con derivate) sono i più comuni.
+
+---
+
+# 3. Estensione: cosa succede al variare di n
+
+Generiamo campioni Bernoulli più grandi (sempre con $p_{\text{vero}} = 2/3$) e confrontiamo le log-likelihood.
+
+```{r loglik-vs-n, fig.width=8, fig.height=5}
+set.seed(7369)
+p_true <- 2/3
+
+# tre dimensioni campionarie
+n_values <- c(3, 30, 300)
+colors <- c("red", "blue", "darkgreen")
+
+# range di p su cui valutare
+p_vals <- seq(0.01, 0.99, length.out = 200)
+
+# preparo il plot vuoto
+plot(NULL,
+     xlim = c(0, 1), ylim = c(-50, 0),
+     xlab = "p", ylab = "log-likelihood normalizzata",
+     main = "Log-likelihood al variare di n (campioni Bernoulli)")
+
+abline(v = p_true, col = "gray", lty = 2)
+
+for (i in seq_along(n_values)) {
+  n <- n_values[i]
+  set.seed(7369)
+  sample_n <- rbinom(n, size = 1, prob = p_true)
+  
+  loglik_n <- sapply(p_vals, logLik, data = sample_n)
+  
+  # normalizzo sottraendo il massimo (per visualizzazione comparabile)
+  loglik_n <- loglik_n - max(loglik_n)
+  
+  lines(p_vals, loglik_n, col = colors[i], lwd = 2)
+}
+
+legend("bottomleft",
+       legend = paste("n =", n_values),
+       col = colors, lwd = 2,
+       cex = 0.9)
+```
+
+**Commento.**
+
+Tre comportamenti chiave emergono:
+
+1. **Concentrazione**: per $n$ piccolo ($n = 3$, rosso) la log-likelihood è **piatta** — tanti valori di $p$ sono ugualmente plausibili. Per $n = 300$ (verde) è **estremamente concentrata** attorno al valore vero $p = 2/3$.
+
+2. **Curvatura crescente**: la log-likelihood è **più curvata** (a punta) per $n$ grande. Questo è esattamente quello che misura la **Fisher information**: $I_n(\theta) = n \cdot \bar I(\theta)$. Più dati significa più curvatura e MLE più precisa.
+
+3. **Standard error decrescente**: la varianza asintotica della MLE è $1/I_n(\theta)$. Per $n$ grande $I_n$ cresce e SE diminuisce. È il riflesso della **consistenza** dello stimatore.
+
+> **Connessione operativa**: nel `summary()` di un `glm()` o `lm()`, gli "Std. Error" dei coefficienti sono calcolati proprio invertendo la Fisher information stimata. Quanto più curvata è la log-likelihood al massimo, tanto più piccoli sono questi standard error.
+
+---
+
+# 4. Secondo esempio: MLE per la media di una Gaussiana
+
+Cambiamo distribuzione per consolidare il pattern.
+
+## 4.1 Setup
+
+$X_i \sim \mathcal{N}(\mu, \sigma^2)$ iid con $\sigma$ noto. Vogliamo stimare $\mu$.
+
+Dalla teoria: $\hat\mu_{ML} = \bar X$ (la MLE della media è la media campionaria). Verifichiamolo numericamente.
+
+```{r gaussian-mle-setup}
+set.seed(7369)
+n <- 50
+mu_true <- 5
+sigma_known <- 2
+
+# campione
+y <- rnorm(n, mean = mu_true, sd = sigma_known)
+mean(y)        # MLE analitica = media campionaria
+```
+
+## 4.2 Log-likelihood gaussiana
+
+$\ell(\mu) = \sum_i \log \phi(y_i; \mu, \sigma)$
+
+In R uso direttamente `dnorm(..., log = TRUE)` che è più pulito.
+
+```{r gaussian-loglik}
+logLik_gauss <- function(mu, data, sigma) {
+  sum(dnorm(data, mean = mu, sd = sigma, log = TRUE))
+}
+
+# valuto su una griglia
+mu_vals <- seq(0, 10, length.out = 200)
+loglik_gauss <- sapply(mu_vals, logLik_gauss, data = y, sigma = sigma_known)
+
+# MLE numerica via griglia
+mu_mle_grid <- mu_vals[which.max(loglik_gauss)]
+mu_mle_grid
+
+# MLE numerica via optim
+result_gauss <- optim(par = 0,
+                      fn = function(mu) -logLik_gauss(mu, y, sigma_known),
+                      method = "Brent",
+                      lower = -10, upper = 20)
+result_gauss$par
+```
+
+## 4.3 Plot
+
+```{r plot-gauss-loglik}
+plot(mu_vals, loglik_gauss,
+     type = "l", lwd = 2, col = "blue",
+     main = "Log-likelihood gaussiana (mu ignoto, sigma noto)",
+     xlab = expression(mu),
+     ylab = expression(log~L(mu)))
+
+abline(v = mean(y), col = "red", lty = 2, lwd = 2)
+abline(v = mu_true, col = "darkgreen", lty = 3, lwd = 2)
+
+legend("bottomleft",
+       legend = c("MLE = media camp.", "valore vero"),
+       col = c("red", "darkgreen"),
+       lty = c(2, 3), lwd = 2,
+       cex = 0.8)
+```
+
+**Commento.**
+
+La log-likelihood ha forma **simmetrica e quadratica** attorno al massimo (è una proprietà della gaussiana: la log-likelihood è esattamente una parabola in $\mu$). La MLE numerica via griglia e via `optim()` coincidono entrambe con la **media campionaria**, $\bar y \approx 4.96$, in coerenza con il risultato analitico.
+
+Il valore vero $\mu = 5$ è leggermente diverso dalla MLE: questa differenza è dovuta alla **variabilità campionaria** — con $n = 50$ osservazioni, la media campionaria fluttua attorno a $\mu$ con SE $= \sigma/\sqrt{n} = 2/\sqrt{50} \approx 0.28$. La stima ottenuta è ben dentro questo intervallo di incertezza.
+
+---
+
+# Conclusioni della sessione
+
+Abbiamo visto **3 modi equivalenti** di trovare un MLE:
+
+1. **Analitico** (quando esiste in forma chiusa): $\hat p = \bar x$ per Bernoulli, $\hat\mu = \bar y$ per gaussiana
+2. **Griglia** (ricerca esaustiva su valori discretizzati di $\theta$)
+3. **Ottimizzazione numerica** con `optim()` (gold standard per problemi complessi)
+
+E **2 fatti concettuali**:
+
+- All'aumentare di $n$, la log-likelihood diventa più **concentrata** (curvatura crescente) e la MLE più **precisa**
+- La curvatura della log-likelihood al massimo è quantificata dalla **Fisher information**, che a sua volta determina lo standard error asintotico di $\hat\theta$
+
+**Per il cheat-sheet (sezione MLE)**:
+
+- Template di funzione `logLik(theta, data)` adattabile a diverse distribuzioni
+- Pattern `optim(par, fn = neg_logLik, method = "Brent", lower, upper)`
+- Visualizzazione log-likelihood con linea verticale al MLE
+- Esempi standard: Bernoulli (MLE = $\bar x$), Gaussiana con $\sigma$ noto (MLE di $\mu$ = $\bar x$)

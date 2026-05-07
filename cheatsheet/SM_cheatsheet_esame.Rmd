@@ -521,50 +521,779 @@ par(mfrow = c(1, 1))
 
 ## Maximum Likelihood Estimation
 
-<!-- Giorno 3: template log-likelihood + optim -->
+### Concetti chiave
+
+- **Likelihood** $L(\theta) = \prod_i f(x_i; \theta)$: funzione di $\theta$ dati i dati osservati. Misura quanto un valore di $\theta$ "spiega bene" i dati.
+- **Log-likelihood** $\ell(\theta) = \sum_i \log f(x_i; \theta)$: si usa sempre questa (più stabile numericamente, derivate più semplici, stesso punto di massimo).
+- **MLE**: $\hat\theta_{ML} = \arg\max \ell(\theta)$.
+
+**Proprietà degli stimatori MLE** (utili da citare nei commenti):
+
+- **Consistente** (converge a $\theta$ per $n \to \infty$)
+- **Asintoticamente unbiased**
+- **Asintoticamente normale**: $\hat\theta \sim \mathcal{N}(\theta, 1/I(\theta))$
+- **Asintoticamente efficiente** (varianza minima tra stimatori consistenti)
+
+La **Fisher information** $I(\theta)$ misura la curvatura della log-likelihood al massimo. Più curvatura significa più informazione e quindi standard error più piccoli.
+
+### Esempi standard (formule chiuse)
+
+Quando esistono in forma chiusa, basta calcolarle direttamente:
+
+| Modello | Parametro | MLE |
+|---------|-----------|-----|
+| Bernoulli($p$) | $p$ | $\hat p = \bar x$ |
+| Binomiale($n, p$) | $p$ | $\hat p = x/n$ |
+| $\mathcal{N}(\mu, \sigma^2)$, $\sigma$ noto | $\mu$ | $\hat\mu = \bar x$ |
+| $\mathcal{N}(\mu, \sigma^2)$ entrambi ignoti | $\mu, \sigma^2$ | $\hat\mu = \bar x$, $\hat\sigma^2 = \frac{1}{n}\sum(x_i - \bar x)^2$ |
+| Poisson($\lambda$) | $\lambda$ | $\hat\lambda = \bar x$ |
+
+### Pattern: log-likelihood + ricerca su griglia
+
+Adattabile a qualunque modello sostituendo `dXXX`:
+
+```{r mle-grid, eval=FALSE}
+# log-likelihood Bernoulli (esempio del prof)
+logLik <- function(p, data) {
+  sum(data * log(p) + (1 - data) * log(1 - p))
+}
+
+# oppure più generico, usando dnorm/dbinom/dpois con log = TRUE
+logLik <- function(theta, data) {
+  sum(dnorm(data, mean = theta, sd = sigma_known, log = TRUE))
+}
+
+# valuto su griglia
+theta_vals <- seq(theta_min, theta_max, length.out = 200)
+loglik_vals <- sapply(theta_vals, logLik, data = my_data)
+
+# MLE numerica
+theta_mle <- theta_vals[which.max(loglik_vals)]
+```
+
+### Pattern: ottimizzazione numerica con `optim()`
+
+Gold standard per problemi multiparametrici o senza formula chiusa:
+
+```{r mle-optim, eval=FALSE}
+# negazione perché optim minimizza
+neg_logLik <- function(theta, data) {
+  -sum(dXXX(data, theta, log = TRUE))    # dXXX = dnorm, dbinom, ...
+}
+
+# 1-D: usare metodo Brent con bound espliciti
+result <- optim(par    = valore_iniziale,
+                fn     = neg_logLik,
+                data   = my_data,
+                method = "Brent",
+                lower  = lower_bound,
+                upper  = upper_bound)
+
+result$par              # MLE
+result$value            # valore di -logLik al massimo (negativo della max log-lik)
+
+# Multidim: usare BFGS o Nelder-Mead (default)
+result <- optim(par    = c(theta1_init, theta2_init),
+                fn     = neg_logLik,
+                data   = my_data,
+                method = "BFGS")
+```
+
+### Visualizzazione log-likelihood
+
+```{r mle-plot, eval=FALSE}
+plot(theta_vals, loglik_vals,
+     type = "l", lwd = 2, col = "blue",
+     main = "Log-likelihood",
+     xlab = expression(theta),
+     ylab = expression(log~L(theta)))
+
+abline(v = theta_mle, col = "red", lty = 2, lwd = 2)
+```
+
+### Template di commento (esame)
+
+> Per stimare il parametro [nome], applico il metodo della massima verosimiglianza. La log-likelihood, valutata su una griglia di valori in [range], presenta un massimo unico in $\hat\theta = $ [valore]. Il valore numerico ottenuto coincide [con la stima analitica $\hat\theta = ...$ / con la stima fornita da `optim()`].
+>
+> La log-likelihood appare [piatta / concentrata] attorno al massimo, indicando una stima [poco precisa / precisa]. Per la proprietà di normalità asintotica, $\hat\theta \sim \mathcal{N}(\theta, 1/I(\theta))$: la curvatura della log-likelihood al massimo determina lo standard error della stima.
+
+### Trappole comuni
+
+- `optim()` **minimizza** per default → passare `-logLik` (la funzione negata)
+- Per problemi 1-D con vincoli (es. $p \in (0,1)$, $\sigma > 0$), usare `method = "Brent"` con `lower` e `upper` espliciti
+- Usare `dnorm(..., log = TRUE)` invece di `log(dnorm(...))`: più stabile numericamente
+- Il `set.seed()` non serve nel MLE in sé: serve solo se generi i dati simulati prima
+
+---
 
 ## Bootstrap e intervalli di confidenza
 
-<!-- Giorno 4: bootstrap manuale + libreria boot + percentile CI -->
+### Concetti chiave
+
+- **Idea**: simulare la variabilità di $\hat\theta$ ricampionando dal campione originale **con ripetizione**.
+- **Plug-in principle**: $\hat F_n$ (ECDF) sostituisce $F$ (popolazione ignota).
+- **Procedura in 4 passi**: resample → compute → repeat $B$ volte → usa la distribuzione empirica.
+
+**Quanti $B$?**
+
+- $B = 200$ basta per stimare lo standard error
+- $B = 1000$–$2000$ raccomandato per costruire intervalli di confidenza
+
+**Quando usarlo**: stimatori complessi senza formule chiuse (correlazione, $R^2$, mediana, differenza tra medie/mediane di due gruppi), oppure quando la distribuzione asintotica non è normale.
+
+### Pattern A: bootstrap manuale con loop
+
+Più trasparente dal punto di vista didattico:
+
+```{r boot-manual, eval=FALSE}
+set.seed(7369)
+B <- 1000
+n <- length(x)
+
+theta_boot <- numeric(B)
+
+for (b in 1:B) {
+  resample <- sample(x, size = n, replace = TRUE)
+  theta_boot[b] <- mean(resample)            # sostituisci con la statistica di interesse
+}
+```
+
+### Pattern B: con la libreria `bootstrap` (stile prof)
+
+Più compatto, è quello che usa Brusa nelle Solutions:
+
+```{r boot-library, eval=FALSE}
+library(bootstrap)
+
+set.seed(7369)
+n <- length(x)
+
+# funzione ausiliaria: prende indici, restituisce la statistica
+aux_fun <- function(ind) {
+  mean(x[ind])                               # sostituire con la statistica di interesse
+}
+
+result_boot <- bootstrap::bootstrap(x = 1:n,
+                                    nboot = 1000,
+                                    theta = aux_fun)
+
+# accesso alle B stime bootstrap
+theta_boot <- result_boot$thetastar
+```
+
+**Per statistiche su 2 campioni** (es. differenza medie A e B):
+
+```{r boot-two-samples, eval=FALSE}
+aux_fun <- function(ind) {
+  A.boot <- A[ind]
+  B.boot <- B[ind]
+  mean(A.boot) - mean(B.boot)
+}
+diff.boot <- bootstrap::bootstrap(x = 1:n,
+                                  nboot = 1000,
+                                  theta = aux_fun)
+```
+
+### Standard error e bias
+
+```{r boot-se-bias, eval=FALSE}
+# stima puntuale originale
+theta_orig <- mean(x)
+
+# standard error = SD delle B stime bootstrap
+se_boot <- sd(theta_boot)
+
+# bias = differenza tra media bootstrap e stima originale
+bias_boot <- mean(theta_boot) - theta_orig
+
+# rapporto SE / stima (utile per il commento)
+round(100 * se_boot / theta_orig, 2)         # in %
+```
+
+### Intervallo di confidenza con il metodo percentile
+
+```{r boot-ci, eval=FALSE}
+# CI 95%
+quantile(theta_boot, probs = c(0.025, 0.975))
+
+# CI 90%
+quantile(theta_boot, probs = c(0.05, 0.95))
+
+# CI 99%
+quantile(theta_boot, probs = c(0.005, 0.995))
+```
+
+### Plot della distribuzione bootstrap
+
+Pattern standard delle Solutions del prof:
+
+```{r boot-plot, eval=FALSE}
+hist(theta_boot,
+     breaks = 40,
+     freq = FALSE,                           # densità invece di frequenze
+     col = "lightgray", border = "white",
+     main = "Bootstrap distribution",
+     xlab = "Stima bootstrap",
+     ylab = "Densità")
+
+# linea verticale alla stima originale
+abline(v = theta_orig, col = "red", lwd = 2, lty = 1)
+
+# linea verticale alla media delle B stime bootstrap
+abline(v = mean(theta_boot), col = "blue", lwd = 2, lty = 2)
+
+# se hai calcolato il CI: linee tratteggiate ai bound
+ci <- quantile(theta_boot, c(0.025, 0.975))
+abline(v = ci, col = "green", lwd = 2, lty = 2)
+
+legend("topright",
+       legend = c("Stima originale", "Media bootstrap", "CI bounds"),
+       col = c("red", "blue", "green"),
+       lty = c(1, 2, 2), lwd = 2,
+       cex = 0.7)
+```
+
+### CI percentile vs CI simmetrico
+
+Il **CI percentile** è preferito al **CI simmetrico** $\hat\theta \pm 1.96 \cdot \widehat{se}$ quando:
+
+- la distribuzione di $\hat\theta$ è **asimmetrica**
+- $\hat\theta$ ha **range vincolato** (es. correlazione in $[-1,1]$, varianza $> 0$, proporzione in $[0,1]$)
+- la dimensione campionaria è **piccola**
+
+Per la **media** in campioni grandi, i due CI tendono a coincidere (TLC garantisce normalità asintotica).
+
+### Template di commento (esame)
+
+**Per il bootstrap della stima**:
+
+> Ho applicato il bootstrap non parametrico con $B = 1000$ replicazioni per stimare l'accuratezza di [statistica]. La distribuzione bootstrap si concentra attorno alla stima puntuale originale ([valore]), e la media delle replicazioni è praticamente coincidente con essa, come atteso. Lo standard error stimato è [valore], pari al [X]% della stima originale: si tratta di una stima [precisa / poco precisa].
+
+**Per il plot**:
+
+> L'istogramma della distribuzione bootstrap mostra una forma [simmetrica e approssimativamente normale / asimmetrica con coda destra/sinistra / bimodale]. Le linee verticali corrispondono alla stima originale e alla media delle replicazioni bootstrap: la loro [coincidenza / vicinanza] conferma che lo stimatore è [non distorto / lievemente distorto] rispetto al campione. La larghezza della distribuzione fornisce una rappresentazione visuale dello standard error.
+
+**Per il CI percentile**:
+
+> L'intervallo di confidenza al [livello]% per [parametro], calcolato con il metodo percentile, è [(lower, upper)]. Possiamo affermare con un livello di confidenza del [X]% che il vero valore del parametro si trova in questo intervallo. La larghezza dell'intervallo ([upper-lower]) riflette l'incertezza della stima.
+
+### Trappole comuni
+
+- **Resampling senza ripetizione** è inutile: produrrebbe solo permutazioni del campione originale, $\hat\theta$ non cambierebbe (è simmetrico nei dati)
+- Il **`set.seed()`** è obbligatorio in ogni chunk di bootstrap, altrimenti non riproducibile
+- **Bootstrap della mediana / quantili**: con $n$ piccolo, la distribuzione bootstrap è discreta e ha pochi valori distinti — i CI possono essere imprecisi (vedi Es. 12 nelle Solutions)
+- Il bootstrap **non corregge** errori sistematici: se il campione originale è distorto, anche il bootstrap lo è
+
+# Linear Regression — Cheat Sheet (Chapters 4–10)
+
+> Nota: tutti gli snippet sono testati e basati sul codice ufficiale del corso (Applications + Solutions Brusa). Pronti da copiare e adattare.
 
 ---
 
-# Regressione Lineare Multipla
+## Model fit and reading the summary
 
-## Fit del modello e lettura del summary
+### Specification
 
-<!-- Giorno 6-7: lm(), summary, coefficienti, R^2 -->
+Multiple linear regression model:
 
-## Diagnostica (residui, leverage, Cook, VIF)
+$$Y_i = \beta_0 + \beta_1 x_{i1} + \beta_2 x_{i2} + \dots + \beta_p x_{ip} + \epsilon_i$$
 
-<!-- Giorno 8, 10: diagnostic plots, hatvalues, cooks.distance, vif -->
+**Five assumptions** (always state them in your analysis):
 
-### Tabella riassuntiva diagnostica
+1. **Linearity**: response is a linear and additive function of covariates
+2. **Zero-mean errors**: $\mathbb{E}[\epsilon_i] = 0$
+3. **Homoscedasticity**: $\text{Var}(\epsilon_i) = \sigma^2$ constant for all $i$
+4. **Independence**: $\text{Cov}(\epsilon_i, \epsilon_j) = 0$ for $i \neq j$
+5. **Normality** (needed for t-test, F-test, CI): $\epsilon_i \sim \mathcal{N}(0, \sigma^2)$
 
-| Sintomo | Strumento | Soglia indicativa |
-|---------|-----------|-------------------|
-| Outlier nei residui | residui standardizzati | > |2| o > |3| |
-| Leverage alto | h_ii | > 2p/n |
-| Punto influente | distanza di Cook | > 1 (o > 4/n) |
-| Multicollinearità | VIF | > 5 (attenzione), > 10 (serio) |
+### Fitting the model
 
-## Inferenza: F-test, t-test, intervalli di confidenza
+```{r lm-fit, eval=FALSE}
+# fit a multiple linear regression
+mod <- lm(y ~ x1 + x2 + x3, data = df)
 
-<!-- Giorno 9: anova, confint, interpretazione -->
+# fit using all available covariates
+mod_full <- lm(y ~ ., data = df)
 
-## Variabili categoriche e interazioni
+# print results
+summary(mod)
+```
 
-<!-- Giorno 12: dummy, relevel, interpretazione coefficienti, interazioni -->
+### Reading the summary
 
-## Selezione del modello
+The output of `summary(lm)` is structured as follows:
 
-<!-- Giorno 11: step, stepAIC, AIC vs BIC -->
+```
+Coefficients:
+            Estimate Std. Error t value Pr(>|t|)    
+(Intercept)  12.345    1.234     10.0   <2e-16 ***  ← intercept
+x1            0.567    0.123      4.6   1e-05  ***  ← coefficient for x1
+x2           -0.234    0.089     -2.6   0.012  *    ← coefficient for x2
 
-## Predizione (CI vs PI)
+Residual standard error: 0.95 on 47 degrees of freedom   ← S, sqrt(RSS/(n-p-1))
+Multiple R-squared:  0.78,    Adjusted R-squared:  0.76    ← R^2 and R^2-adj
+F-statistic: 55.2 on 3 and 47 DF,  p-value: < 2.2e-16    ← global F-test
+```
 
-<!-- Giorno 11: predict con interval="confidence" vs "prediction" -->
+**What to comment**:
+
+- **Coefficients**: estimated value, sign (matches expectation?), magnitude, significance (`***`, `**`, `*`, `.`)
+- **Residual standard error**: estimate of $\sigma$. Smaller is better
+- **R-squared**: fraction of variance explained
+- **Adjusted R-squared**: same but penalized for number of parameters (use it to compare models with different $p$)
+- **F-statistic**: tests $H_0$: all $\beta_k = 0$. If significant, at least one covariate is useful
+
+### Extracting components
+
+```{r lm-extract, eval=FALSE}
+coef(mod)              # estimated coefficients
+fitted(mod)            # predicted values y_hat
+residuals(mod)         # residuals (y - y_hat)
+confint(mod)           # 95% CI for coefficients
+confint(mod, level = 0.99)   # custom confidence level
+sigma(mod)             # residual standard error
+summary(mod)$r.squared       # R^2
+summary(mod)$adj.r.squared   # adjusted R^2
+```
+
+### Comment template
+
+> The estimated model is $\hat{Y} = \hat{\beta}_0 + \hat{\beta}_1 x_1 + \dots$. The coefficient of `[variable]` is `[value]`, statistically significant at the `[α]` level (p-value = `[value]`). It can be interpreted as: a unit increase in `[variable]` is associated with an average change of `[value]` units in $Y$, **holding all other covariates constant**.
+>
+> The model explains `[R²]` of the variance in the response. The F-statistic is `[value]` with p-value `[value]`, indicating that at least one covariate is significantly associated with $Y$.
 
 ---
+
+## Diagnostics: residuals, leverage, Cook, VIF
+
+### The four diagnostic plots
+
+```{r diagnostic-plots, eval=FALSE}
+par(mfrow = c(2, 2))
+plot(mod)
+par(mfrow = c(1, 1))
+```
+
+R produces four plots — what to look for in each:
+
+| Plot | Pattern OK | Pattern problematic | Assumption violated |
+|------|------------|---------------------|---------------------|
+| Residuals vs Fitted | Random cloud around 0 | U-shape / parabola | Linearity |
+| Residuals vs Fitted | Random cloud around 0 | Funnel shape | Homoscedasticity |
+| Normal Q-Q | Points on line | Points deviating in tails | Normality |
+| Scale-Location | Horizontal red line | Tilted/curved red line | Homoscedasticity |
+| Residuals vs Leverage | No points beyond Cook contours | Points outside dashed lines | Influential observations |
+
+### Detecting unusual observations
+
+```{r unusual-observations, eval=FALSE}
+# leverage values (hat values)
+h <- hatvalues(mod)
+n <- nrow(df)
+p <- length(coef(mod)) - 1
+threshold_lev <- 2 * (p + 1) / n
+which(h > threshold_lev)              # high-leverage observations
+
+# standardized residuals
+rstd <- rstandard(mod)
+which(abs(rstd) > 2)                  # potential outliers (residuals)
+
+# Cook's distance
+cook <- cooks.distance(mod)
+which(cook > 1)                        # influential observations (strict)
+which(cook > 4/n)                      # influential (more sensitive threshold)
+
+# combined diagnostic plot
+plot(cook, type = "h", main = "Cook's distance",
+     xlab = "Observation index", ylab = "Cook's D")
+abline(h = 4/n, lty = 2, col = "red")
+```
+
+### Diagnostic summary table
+
+| Type | What's anomalous | Measure | Indicative threshold |
+|------|------------------|---------|---------------------|
+| Outlier | Residual $z_i$ | Standardized residuals | $\|r^*\| > 2$ or $> 3$ |
+| Leverage point | Covariates $x_i$ | Hat values $h_{ii}$ | $> 2(p+1)/n$ |
+| Influential point | Effect on $\hat\beta$ | Cook's distance $D_i$ | $> 1$ (strict), $> 4/n$ (sensitive) |
+
+> **Key distinction**: high leverage does NOT imply influential. A point with $h_{ii} = 0.4$ and $r^* \approx 0$ is on the leverage edge but lies on the regression line, so removing it doesn't change $\hat\beta$ → not influential.
+
+### Multicollinearity: VIF
+
+```{r vif, eval=FALSE}
+library(car)
+
+vif(mod)                    # VIF for each covariate
+```
+
+**Interpretation thresholds**:
+
+| VIF | Diagnosis |
+|-----|-----------|
+| ~1 | No multicollinearity |
+| 1–5 | Tolerable |
+| 5–10 | Worth attention |
+| > 10 | Serious problem |
+
+**Symptoms of multicollinearity**:
+
+- F-test globally significant but no individual t-test significant
+- Coefficient signs unexpected (negative when theory says positive)
+- Standard errors very large relative to coefficient magnitudes
+- High correlations in `cor(df_covariates)`
+
+**Remedies if VIF too high**:
+
+1. Remove one of the correlated variables (the less interpretable / less theoretically grounded)
+2. Combine them into a single derived variable (sum, average, principal component)
+3. Increase sample size (reduces SE but not collinearity itself)
+4. Use ridge regression (out of scope for this course)
+
+### Comment templates
+
+For diagnostics:
+
+> The Residuals vs Fitted plot shows `[a random cloud around zero / a U-shaped pattern / a funnel shape]`, suggesting that the assumption of `[linearity / homoscedasticity]` `[is / is not]` satisfied. The Normal Q-Q plot indicates `[approximate normality / heavy tails / asymmetry]`.
+
+For unusual observations:
+
+> Observation `[ID]` has a Cook's distance of `[value]`, exceeding the threshold of `[4/n or 1]`. It also shows `[high leverage / a large standardized residual]`. This observation has a substantial influence on the parameter estimates and warrants further investigation. Removing it changes the estimated coefficient of `[variable]` from `[old value]` to `[new value]`.
+
+For multicollinearity:
+
+> The variable `[name]` has a VIF of `[value]`, exceeding the threshold of 10 (or 5). This indicates substantial multicollinearity, which inflates the standard errors of the regression coefficients and reduces the power of the t-tests. The high VIF is consistent with the strong correlation observed between `[variable]` and `[other variable]` in the correlation matrix.
+
+---
+
+## Inference: F-test, t-test, confidence intervals
+
+### Global F-test
+
+Tests $H_0$: all coefficients (except intercept) are zero. Already shown in the bottom of `summary(mod)`. To extract:
+
+```{r f-test, eval=FALSE}
+f_stat <- summary(mod)$fstatistic
+f_stat                     # value, df1, df2
+
+# p-value of the F-test
+pf(f_stat[1], f_stat[2], f_stat[3], lower.tail = FALSE)
+```
+
+### Nested F-test (compare two models)
+
+Tests whether a subset of coefficients can all be set to zero (i.e., comparing a reduced model to a full one).
+
+```{r nested-f, eval=FALSE}
+# fit reduced and full models
+mod_reduced <- lm(y ~ x1, data = df)
+mod_full    <- lm(y ~ x1 + x2 + x3, data = df)
+
+# F-test for nested comparison
+anova(mod_reduced, mod_full)
+```
+
+The output gives the F-statistic, df, and p-value. If significant → the additional covariates are jointly useful.
+
+### Individual t-tests
+
+Already shown in `summary(mod)` (column `Pr(>|t|)`). Tests $H_0: \beta_k = 0$ for each $k$ separately.
+
+**Quick rule of thumb**: $|t| > 2$ implies significance at the 5% level (for $n$ reasonably large).
+
+### Confidence intervals for coefficients
+
+```{r confint, eval=FALSE}
+confint(mod)                       # 95% CI for all coefficients
+confint(mod, level = 0.99)         # 99% CI
+confint(mod, parm = "x1")          # CI for a specific coefficient
+```
+
+**Manual calculation** (useful for understanding):
+
+```{r confint-manual, eval=FALSE}
+# CI 95% for beta_k
+beta_hat <- coef(mod)["x1"]
+se_beta  <- sqrt(diag(vcov(mod)))["x1"]
+t_critical <- qt(0.975, df = mod$df.residual)
+
+ci_lower <- beta_hat - t_critical * se_beta
+ci_upper <- beta_hat + t_critical * se_beta
+c(ci_lower, ci_upper)
+```
+
+### Comment templates
+
+For F-test:
+
+> The global F-test yields F = `[value]` with `[df1]` and `[df2]` degrees of freedom and p-value `[value]`. We `[reject / fail to reject]` $H_0$ at the 5% level: the model `[provides a significantly better fit than the null model / is not significantly better than the null model]`.
+
+For t-test:
+
+> The coefficient of `[variable]` is `[value]` with t-value `[value]` and p-value `[value]`. We `[reject / fail to reject]` $H_0: \beta_k = 0$ at the `[α]` level. Hence, `[variable]` `[is / is not]` significantly associated with the response, holding the other covariates constant.
+
+For CI:
+
+> The 95% confidence interval for $\beta_{[variable]}$ is `[lower, upper]`. We are 95% confident that the true coefficient lies in this interval. Since the interval `[contains / does not contain]` zero, the coefficient is `[not / yes]` significantly different from zero at the 5% level.
+
+---
+
+## Model selection: AIC, BIC, stepwise
+
+### Information criteria
+
+```{r aic-bic, eval=FALSE}
+AIC(mod)              # Akaike Information Criterion
+BIC(mod)              # Bayesian Information Criterion (more conservative)
+
+# compare multiple models
+AIC(mod1, mod2, mod3)
+BIC(mod1, mod2, mod3)
+```
+
+**Lower is better.** Always compare across models on the **same dataset**.
+
+### Stepwise selection
+
+```{r stepwise, eval=FALSE}
+library(MASS)
+
+# starting from the full model, remove covariates (backward)
+mod_back <- stepAIC(mod_full, direction = "backward", trace = TRUE)
+
+# starting from the null model, add covariates (forward)
+mod_null <- lm(y ~ 1, data = df)
+mod_fwd  <- stepAIC(mod_null,
+                    scope = list(lower = ~ 1,
+                                 upper = ~ x1 + x2 + x3 + x4),
+                    direction = "forward")
+
+# both directions (recommended default)
+mod_step <- stepAIC(mod_full, direction = "both", trace = TRUE)
+
+# using BIC instead of AIC: change penalty
+n <- nrow(df)
+mod_step_bic <- stepAIC(mod_full, direction = "both", k = log(n))
+
+# final selected model
+summary(mod_step)
+```
+
+The `trace = TRUE` option prints the progress at each step: which variable is added/removed and the resulting AIC.
+
+### Reading the stepwise output
+
+```
+Start: AIC=42.5
+y ~ x1 + x2 + x3 + x4
+
+       Df  Sum of Sq   RSS    AIC
+- x4    1     0.012   12.5   40.5    ← removing x4 lowers AIC
+<none>             12.4   42.5
+- x3    1     0.5     12.9   44.0    ← removing x3 raises AIC
+- x1    1     8.0     20.4   52.0    ← x1 most important
+
+Step:  AIC=40.5
+y ~ x1 + x2 + x3
+...
+```
+
+The `<none>` row indicates the current model. If a `-x` row has lower AIC than `<none>`, that variable will be removed.
+
+### Comment templates
+
+For stepwise selection:
+
+> Stepwise selection based on AIC was performed starting from the full model with `[p]` covariates. The procedure `[removed / retained]` `[variable names]` at each step. The final selected model includes `[selected variables]` and has AIC = `[value]`, lower than the full model (AIC = `[value]`).
+
+For model comparison:
+
+> Comparing AIC and BIC: AIC selects a model with `[k1]` covariates, while BIC selects a more parsimonious model with `[k2]` covariates. Given that BIC penalizes complexity more heavily ($\log(n) = [value] > 2$ for our sample size), this difference is expected. `[Choice based on objective: AIC for prediction, BIC for interpretability.]`
+
+---
+
+## Prediction: confidence interval vs prediction interval
+
+### Two types of prediction
+
+| Goal | Question | Interval type | Width |
+|------|----------|---------------|-------|
+| Mean response | "What is the average $Y$ for units with $x_c$?" | Confidence interval (CI) | Narrower |
+| Single new observation | "What is $Y$ for THIS new unit with $x_c$?" | Prediction interval (PI) | Wider |
+
+The PI is wider because it includes the irreducible variance $\sigma^2$ of the individual error term, in addition to the uncertainty about $\hat\beta$.
+
+### Computation in R
+
+```{r prediction, eval=FALSE}
+# new observation with specified covariate values
+new_data <- data.frame(x1 = 5, x2 = 2.3, x3 = "B")
+
+# point prediction
+predict(mod, newdata = new_data)
+
+# 95% CI for the mean response (confidence interval)
+predict(mod, newdata = new_data, interval = "confidence", level = 0.95)
+
+# 95% PI for a single new observation (prediction interval)
+predict(mod, newdata = new_data, interval = "prediction", level = 0.95)
+```
+
+Output structure:
+
+```
+       fit     lwr      upr
+1   23.45   21.89   25.01    ← CI: tighter
+1   23.45   18.32   28.58    ← PI: wider
+```
+
+### Plotting prediction bands
+
+```{r predict-plot, eval=FALSE}
+# range of x for plotting
+x_range <- seq(min(df$x1), max(df$x1), length.out = 100)
+new_data <- data.frame(x1 = x_range)
+
+# both intervals
+pred_ci <- predict(mod_simple, newdata = new_data, interval = "confidence")
+pred_pi <- predict(mod_simple, newdata = new_data, interval = "prediction")
+
+plot(df$x1, df$y, pch = 16, col = "blue",
+     main = "CI vs PI", xlab = "x1", ylab = "y")
+lines(x_range, pred_ci[, "fit"], lwd = 2, col = "red")
+lines(x_range, pred_ci[, "lwr"], lty = 2, col = "red")
+lines(x_range, pred_ci[, "upr"], lty = 2, col = "red")
+lines(x_range, pred_pi[, "lwr"], lty = 2, col = "darkgreen")
+lines(x_range, pred_pi[, "upr"], lty = 2, col = "darkgreen")
+legend("topleft",
+       legend = c("Fit", "CI 95%", "PI 95%"),
+       col = c("red", "red", "darkgreen"),
+       lty = c(1, 2, 2), lwd = 2, cex = 0.8)
+```
+
+### Comment template
+
+> For a new unit with covariates `[values]`, the predicted response is `[value]`. The 95% confidence interval for the mean response is `[L_ci, U_ci]`: with 95% confidence, the average response for units with these covariate values lies in this interval. The 95% prediction interval for a single new observation is `[L_pi, U_pi]`, wider because it accounts for the irreducible individual variability $\sigma^2$ in addition to the uncertainty in the estimated coefficients.
+
+---
+
+## Categorical covariates and interactions
+
+### Dummy coding (automatic in R)
+
+R automatically creates $J-1$ dummies for a categorical variable with $J$ levels. The first level (alphabetical order) becomes the reference.
+
+```{r factors-basics, eval=FALSE}
+# verify factor structure
+str(df$category)
+levels(df$category)        # first level is the reference
+
+# convert character to factor
+df$category <- as.factor(df$category)
+
+# change reference level
+df$category <- relevel(df$category, ref = "specific_level")
+
+# fit a model with categorical covariate
+mod <- lm(y ~ x_continuous + x_categorical, data = df)
+summary(mod)
+```
+
+### Interpretation of coefficients
+
+For a categorical variable with levels A (reference), B, C, D:
+
+```
+Coefficients:
+              Estimate    
+(Intercept)    25000        ← E[Y] for reference category A (other covariates = 0)
+xCategoryB     1500         ← E[Y in B] - E[Y in A], holding others constant
+xCategoryC    -800
+xCategoryD     2100
+```
+
+### Parallel-lines model (no interaction)
+
+```{r parallel-lines, eval=FALSE}
+mod_parallel <- lm(y ~ x1 + group, data = df)
+```
+
+Same slope $\beta_1$ for all groups, different intercepts.
+
+### Model with interaction
+
+```{r interaction, eval=FALSE}
+# x1 * group expands to x1 + group + x1:group
+mod_interact <- lm(y ~ x1 * group, data = df)
+summary(mod_interact)
+
+# only the interaction term, without main effects (rare):
+mod_inter_only <- lm(y ~ x1:group, data = df)
+```
+
+For binary `group` (0/1):
+
+| Group | Slope of $x_1$ | Intercept |
+|-------|----------------|-----------|
+| 0 (reference) | $\beta_1$ | $\beta_0$ |
+| 1 | $\beta_1 + \gamma$ | $\beta_0 + \delta$ |
+
+The coefficient $\gamma$ on the interaction term measures **how much the slope changes** between groups.
+
+### Testing the interaction
+
+```{r interaction-test, eval=FALSE}
+# t-test on the interaction coefficient (in summary)
+summary(mod_interact)
+
+# nested F-test: with vs without interaction
+anova(mod_parallel, mod_interact)
+```
+
+If the F-test or t-test on the interaction is significant → the interaction is needed (groups have different slopes). Otherwise → the parallel-lines model is preferable for parsimony.
+
+### Visualizing interactions
+
+```{r interaction-plot, eval=FALSE}
+# scatterplot with separate fitted lines per group
+plot(df$x1, df$y,
+     col = as.numeric(df$group),
+     pch = 16,
+     main = "Interaction visualization",
+     xlab = "x1", ylab = "y")
+
+# add fitted lines for each group
+for (g in levels(df$group)) {
+  subset_g <- df[df$group == g, ]
+  abline(lm(y ~ x1, data = subset_g),
+         col = which(levels(df$group) == g))
+}
+legend("topleft", legend = levels(df$group),
+       col = 1:nlevels(df$group), lty = 1, cex = 0.8)
+```
+
+### Comment templates
+
+For categorical covariate:
+
+> The variable `[category]` has a significant effect on the response. Compared to the reference category `[ref]`, units in category `[B]` have a `[higher / lower]` average response by `[value]` units, holding other covariates constant. The effect is statistically significant (p-value `[value]`).
+
+For parallel-lines vs interaction:
+
+> A nested F-test compares the parallel-lines model with the interaction model. The F-statistic is `[value]` (p-value `[value]`), so we `[reject / fail to reject]` $H_0$ that the slopes are equal across groups. The `[interaction / parallel-lines]` model is preferred. The estimated slope of `[x1]` is `[value1]` for the reference group `[A]` and `[value1 + γ]` for group `[B]` — meaning that the effect of `[x1]` on $Y$ is `[stronger / weaker]` for group `[B]`.
+
+---
+
+## Common pitfalls (regression)
+
+- **R² always increases** when adding covariates, even useless ones → use adjusted R² for model comparison
+- **Significant F + non-significant t-tests** → typical sign of multicollinearity (check VIF)
+- **High leverage ≠ influential** → a leverage point with small residual is on the regression line and doesn't change $\hat\beta$
+- **Statistical significance ≠ practical importance** → a coefficient with p < 0.001 may have a tiny effect size; always report magnitude alongside p-values
+- **Model selection ≠ causal identification** → AIC/BIC find good predictive models, not causal effects
+- **In GLMs**: the t-test in `summary` is a Wald test; for nested comparisons use `anova(mod, test = "Chisq")` (likelihood ratio test)
+- **Categorical variable read as numeric** → wrong model; check with `str(df)` and convert with `as.factor()` if needed
+
 
 # Regressione Logistica
 
