@@ -128,8 +128,8 @@ qnorm(0.975)                           # ≈ 1.96, per CI al 95% con sigma noto
 qt(0.975, df = n - 1)                  # per CI al 95% con sigma stimato
 ```
 
-**Template di commento (uso tipico nei test/CI):**
-> Il quantile teorico al 97.5% per la distribuzione [normale/t con `df` gradi di libertà] è `[valore]`. Lo uso per costruire un intervallo di confidenza al 95% per `[parametro]`.
+**Comment template (typical use in tests/CIs):**
+> The theoretical 97.5th percentile of the [normal / t with `df` degrees of freedom] distribution is `[value]`. I use it to construct a 95% confidence interval for `[parameter]`.
 
 ### Generare campioni e trasformazioni lineari
 
@@ -234,9 +234,9 @@ legend("topleft",
 - **Curva più ripida al centro** = distribuzione più concentrata (varianza minore)
 - **Curva più dolce** = distribuzione più dispersa
 
-**Template di commento:**
+**Comment template:**
 
-> L'ECDF della variabile `[nome]` mostra una distribuzione [concentrata / dispersa] attorno al valore `[mediana]`, con [pochi / molti] valori estremi nelle code.
+> The ECDF of the variable `[name]` shows a distribution [concentrated / spread out] around the value `[median]`, with [few / many] extreme values in the tails.
 
 ---
 
@@ -275,11 +275,11 @@ par(mfrow = c(1, 1))
 | Concavità verso il basso | **Asimmetria negativa** (coda sinistra lunga) |
 | Pochi punti isolati lontano dalla retta agli estremi | **Outlier** |
 
-**Template di commento (esame):**
+**Comment template (exam):**
 
-> Il QQ-plot dei [residui / valori] mostra punti [allineati sulla retta / che deviano dalla retta agli estremi]. Concludo che la distribuzione [è / non è] approssimativamente normale, [con code più pesanti / con asimmetria positiva / ...].
+> The QQ-plot of the [residuals / values] shows points [aligned on the reference line / deviating from the line in the tails]. I conclude that the distribution [is / is not] approximately normal, [with heavier tails / with positive asymmetry / ...].
 
-> Specificamente, la presenza di [pattern osservato] suggerisce che [diagnosi]. Questo [conferma / viola] l'assunzione di normalità necessaria per [contesto: regressione, test, ...].
+> Specifically, the presence of [observed pattern] suggests [diagnosis]. This [confirms / violates] the normality assumption required for [context: regression, test, ...].
 
 #### Test formali di normalità (alternativa al QQ-plot)
 
@@ -393,9 +393,9 @@ eig$vectors       # autovettori = direzioni degli assi principali
 eig$vectors %*% diag(eig$values) %*% t(eig$vectors)
 ```
  
-**Template di commento (uso tipico):**
- 
-> Il contour plot mostra ellissi [circolari / inclinate / schiacciate], coerenti con [valori dei parametri della distribuzione]. La forma [è / non è] coerente con quella attesa sotto l'ipotesi di normalità bivariata: in particolare, [forma osservata] suggerisce che $\rho$ è [vicino a zero / positivo / negativo] e che le varianze [sono / non sono] dello stesso ordine di grandezza.
+**Comment template (typical use):**
+
+> The contour plot shows [circular / tilted / flattened] ellipses, consistent with [the parameter values of the distribution]. The shape [is / is not] consistent with what is expected under bivariate normality: in particular, [observed shape] suggests that $\rho$ is [close to zero / positive / negative] and that the variances [are / are not] of the same order of magnitude.
 
 ### Proprietà chiave (mappe mentali per il commento)
 
@@ -457,9 +457,9 @@ pcor.test(x = df$x, y = df$y, z = df$z)
 | Alta | Ancora alta | **Associazione genuina**: persiste anche al netto di Z |
 | Vicina a 0 | Alta | **Paradosso di Simpson**: Z mascherava un'associazione reale |
  
-**Template di commento:**
- 
-> La correlazione marginale tra `[X]` e `[Y]` è pari a `[valore]`, mentre la correlazione parziale al netto di `[Z]` è `[valore]`. La [riduzione / persistenza / inversione] suggerisce che [l'associazione è spiegata da Z / l'associazione è genuina / Z mascherava la relazione].
+**Comment template:**
+
+> The marginal correlation between `[X]` and `[Y]` is `[value]`, while the partial correlation controlling for `[Z]` is `[value]`. The [reduction / persistence / reversal] suggests that [the association is explained by Z / the association is genuine / Z was masking the true relationship].
  
 ### Scatterplot e scatterplot matrix
  
@@ -611,11 +611,11 @@ plot(theta_vals, loglik_vals,
 abline(v = theta_mle, col = "red", lty = 2, lwd = 2)
 ```
 
-### Template di commento (esame)
+### Comment template (exam)
 
-> Per stimare il parametro [nome], applico il metodo della massima verosimiglianza. La log-likelihood, valutata su una griglia di valori in [range], presenta un massimo unico in $\hat\theta = $ [valore]. Il valore numerico ottenuto coincide [con la stima analitica $\hat\theta = ...$ / con la stima fornita da `optim()`].
+> To estimate the parameter [name], I apply the maximum likelihood method. The log-likelihood, evaluated on a grid of values in [range], has a unique maximum at $\hat\theta = $ [value]. The numerical result [coincides with the analytical estimate $\hat\theta = ...$ / matches the estimate from `optim()`].
 >
-> La log-likelihood appare [piatta / concentrata] attorno al massimo, indicando una stima [poco precisa / precisa]. Per la proprietà di normalità asintotica, $\hat\theta \sim \mathcal{N}(\theta, 1/I(\theta))$: la curvatura della log-likelihood al massimo determina lo standard error della stima.
+> The log-likelihood appears [flat / concentrated] around the maximum, indicating a [low-precision / precise] estimate. By the asymptotic normality property, $\hat\theta \sim \mathcal{N}(\theta, 1/I(\theta))$: the curvature of the log-likelihood at the maximum determines the standard error of the estimate.
 
 ### Trappole comuni
 
@@ -763,19 +763,19 @@ Il **CI percentile** è preferito al **CI simmetrico** $\hat\theta \pm 1.96 \cdo
 
 Per la **media** in campioni grandi, i due CI tendono a coincidere (TLC garantisce normalità asintotica).
 
-### Template di commento (esame)
+### Comment template (exam)
 
-**Per il bootstrap della stima**:
+**For the bootstrap estimate**:
 
-> Ho applicato il bootstrap non parametrico con $B = 1000$ replicazioni per stimare l'accuratezza di [statistica]. La distribuzione bootstrap si concentra attorno alla stima puntuale originale ([valore]), e la media delle replicazioni è praticamente coincidente con essa, come atteso. Lo standard error stimato è [valore], pari al [X]% della stima originale: si tratta di una stima [precisa / poco precisa].
+> I applied the non-parametric bootstrap with $B = 1000$ replications to estimate the accuracy of [statistic]. The bootstrap distribution concentrates around the original point estimate ([value]), and the mean of the replications practically coincides with it, as expected. The estimated standard error is [value], equal to [X]% of the original estimate: this is a [precise / imprecise] estimate.
 
-**Per il plot**:
+**For the plot**:
 
-> L'istogramma della distribuzione bootstrap mostra una forma [simmetrica e approssimativamente normale / asimmetrica con coda destra/sinistra / bimodale]. Le linee verticali corrispondono alla stima originale e alla media delle replicazioni bootstrap: la loro [coincidenza / vicinanza] conferma che lo stimatore è [non distorto / lievemente distorto] rispetto al campione. La larghezza della distribuzione fornisce una rappresentazione visuale dello standard error.
+> The histogram of the bootstrap distribution shows a [symmetric and approximately normal / asymmetric with right/left tail / bimodal] shape. The vertical lines correspond to the original estimate and the mean of the bootstrap replications: their [coincidence / proximity] confirms that the estimator is [unbiased / slightly biased] with respect to the sample. The width of the distribution provides a visual representation of the standard error.
 
-**Per il CI percentile**:
+**For the percentile CI**:
 
-> L'intervallo di confidenza al [livello]% per [parametro], calcolato con il metodo percentile, è [(lower, upper)]. Possiamo affermare con un livello di confidenza del [X]% che il vero valore del parametro si trova in questo intervallo. La larghezza dell'intervallo ([upper-lower]) riflette l'incertezza della stima.
+> The [level]% confidence interval for [parameter], computed using the percentile method, is [(lower, upper)]. We can state with [X]% confidence that the true parameter value lies in this interval. The width of the interval ([upper-lower]) reflects the estimation uncertainty.
 
 ### Trappole comuni
 
@@ -1297,17 +1297,411 @@ For parallel-lines vs interaction:
 
 # Regressione Logistica
 
-## Fit con glm e lettura del summary
+## Quando usarla
 
-<!-- Giorno 13-14: glm(family=binomial) -->
+Usa la regressione logistica quando la **risposta è binaria** ($Y \in \{0, 1\}$) e vuoi modellare la **probabilità di successo** in funzione di covariate (continue, categoriali, o entrambe).
+
+**Perché non `lm()` su una risposta binaria?**
+
+- Le predizioni possono uscire da $[0, 1]$
+- Gli errori non sono normali (seguono una Bernoulli)
+- La varianza non è costante: $\text{Var}(Y_i) = p_i(1 - p_i)$ dipende da $p_i$ (eteroschedasticità intrinseca)
+
+### La trasformazione logit
+
+| Quantità | Formula | Range |
+|----------|---------|-------|
+| Probabilità di successo | $p_i = P(Y_i = 1)$ | $[0, 1]$ |
+| Odds | $O_i = p_i / (1 - p_i)$ | $[0, +\infty)$ |
+| Logit | $\log(O_i) = \log[p_i / (1 - p_i)]$ | $(-\infty, +\infty)$ |
+
+Il logit viene modellato linearmente:
+
+$$\text{logit}(p_i) = \log\left(\frac{p_i}{1 - p_i}\right) = \beta_0 + \beta_1 x_{i1} + \dots + \beta_p x_{ip}$$
+
+Trasformazione inversa (per tornare alla probabilità):
+
+$$p_i = \frac{\exp(\beta_0 + \beta_1 x_{i1} + \dots)}{1 + \exp(\beta_0 + \beta_1 x_{i1} + \dots)}$$
+
+Questa è la **funzione logistica** — una curva a S da 0 a 1.
+
+---
+
+## Fit con `glm` e lettura del summary
+
+### Setup e analisi esplorative
+
+```{r logit-setup, eval=FALSE}
+# assicurarsi che la risposta sia un factor con livelli corretti
+df$y <- as.factor(df$y)
+levels(df$y)                        # il primo livello è il riferimento (= "failure" / 0)
+
+# se necessario, cambiare il livello di riferimento
+df$y <- relevel(df$y, ref = "no")   # "no" diventa riferimento, "yes" è il successo
+
+# tabella risposta vs covariata categoriale
+table(df$y, df$x_cat)
+prop.table(table(df$y, df$x_cat), margin = 2)   # frequenze relative per colonna
+
+# statistiche descrittive delle continue per livello di risposta
+by(df[, c("x1", "x2")], df$y, summary)
+boxplot(x1 ~ y, data = df, col = c("lightblue", "salmon"))
+```
+
+### Fit del modello
+
+```{r logit-fit, eval=FALSE}
+mod1 <- glm(y ~ x1 + x2 + x3,
+            data   = df,
+            family = binomial)
+
+summary(mod1)
+```
+
+### Lettura del summary
+
+```
+Coefficients:
+              Estimate Std. Error z value Pr(>|z|)
+(Intercept)   -1.234     0.456    -2.71   0.0067 **    ← Wald test (z, non t)
+x1             0.892     0.234     3.81   0.0001 ***   ← significativo
+x2            -0.456     0.298    -1.53   0.1262        ← non significativo
+
+    Null deviance: 320.5  on 199  degrees of freedom   ← deviance modello nullo
+Residual deviance: 245.8  on 196  degrees of freedom   ← deviance modello stimato
+AIC: 253.8
+```
+
+**Cosa commentare:**
+
+- **Wald z-test** su ogni coefficiente (non t-test): valore critico al 5% è $|z| > 1.96$
+- **Null deviance**: deviance del modello solo-intercetta
+- **Residual deviance**: deviance del modello stimato
+- La riduzione da null a residual deviance misura il miglioramento dovuto alle covariate
+- **AIC** per confronto tra modelli
+
+**Comment template:**
+
+> The estimated logistic regression model is:
+>
+> $\text{logit}(\hat{p}_i) = [\beta_0] + [\beta_1] \cdot \text{[var1]} + [\beta_2] \cdot \text{[var2]} + \dots$
+>
+> The Wald test indicates that `[variable]` is statistically significant at the [α]% level (z = [value], p-value [value]). `[Variable_no]` is not significant (p-value > 0.05), suggesting that, after controlling for the other covariates, it does not add explanatory power for predicting the response.
+>
+> The null deviance is [value] on [df_null] degrees of freedom; the residual deviance is [value] on [df_res] degrees of freedom — a reduction of [diff], indicating that the included covariates [substantially / modestly] improve the fit compared to the null model. The AIC of the model is [value].
+
+---
 
 ## Odds ratio e interpretazione
 
-<!-- Giorno 13: exp(coef), exp(confint), template commento -->
+Questo è il punto **più importante** di ogni analisi logistica. I coefficienti sulla scala logit non si interpretano direttamente — vanno trasformati.
+
+```{r odds-ratios, eval=FALSE}
+# odds ratio (stime puntuali)
+exp(coef(mod1))
+
+# IC 95% per gli odds ratio (asintotico, veloce)
+exp(confint.default(mod1))
+
+# IC 95% basato su profile likelihood (più accurato, lento)
+exp(confint(mod1))
+
+# tabella compatta
+cbind(
+  OR = exp(coef(mod1)),
+  exp(confint.default(mod1))
+)
+```
+
+### Regole di interpretazione
+
+| Quantità | Cosa rappresenta |
+|----------|--------------------|
+| $\exp(\hat\beta_0)$ | Odds di successo quando tutte le covariate sono zero |
+| $\exp(\hat\beta_k)$ per $x_k$ continua | Cambiamento **moltiplicativo** degli odds per un aumento di un'unità in $x_k$, a parità di covariate |
+| $\exp(\hat\beta_k)$ per $x_k$ binaria | Rapporto tra gli odds dei due gruppi, a parità di covariate |
+| $\exp(\hat\beta_k) > 1$ | $x_k$ **aumenta** gli odds di successo |
+| $\exp(\hat\beta_k) < 1$ | $x_k$ **riduce** gli odds di successo |
+| $\exp(\hat\beta_k) = 1$ | Nessun effetto (IC che include 1 → non significativo) |
+
+### Conversione rapida: variazione percentuale degli odds
+
+$$\text{variazione \%} = (\exp(\hat\beta_k) - 1) \cdot 100\%$$
+
+- $\exp(\hat\beta_k) = 1.05$ → "gli odds aumentano del 5%"
+- $\exp(\hat\beta_k) = 1.50$ → "gli odds aumentano del 50%"
+- $\exp(\hat\beta_k) = 0.80$ → "gli odds diminuiscono del 20%"
+
+**Comment template:**
+
+> The estimated odds ratio for `[variable]` is $\exp(\hat\beta) = [value]$, with 95% CI $[L, U]$. Since the CI [does not / does] include 1, the effect of `[variable]` on the odds of success is [statistically significant / not significant] at the 5% level.
+>
+> Specifically, a one-unit increase in `[variable]` is associated with a multiplicative change in the odds of [success_event] by a factor of [value], holding the other covariates constant. Equivalently, the odds [increase / decrease] by [|exp(β) - 1|·100]% per unit increase in `[variable]`.
+
+For a **binary covariate** (e.g., `smoke = 1 vs 0`):
+
+> The estimated odds ratio for smokers vs non-smokers is $\exp(\hat\beta_{smoke}) = [value]$. Holding other covariates constant, smokers have odds of [outcome] that are [value] times those of non-smokers. The 95% CI is $[L, U]$, [not] including 1, confirming [the presence / the absence] of a significant association.
+
+---
+
+## Inferenza: intervalli di confidenza e test
+
+### Likelihood Ratio Test per modelli annidati
+
+```{r lrt, eval=FALSE}
+mod_reduced <- glm(y ~ x1, data = df, family = binomial)
+mod_full    <- glm(y ~ x1 + x2 + x3, data = df, family = binomial)
+
+# LRT (chi-quadro): usare "Chisq", NON F-test come in lm()
+anova(mod_reduced, mod_full, test = "Chisq")
+```
+
+La statistica è la **differenza di deviance** $D = 2[\ell(M_1) - \ell(M_0)]$, distribuita come $\chi^2_{p_1 - p_0}$ sotto $H_0$.
+
+**Comment template:**
+
+> The likelihood ratio test comparing the reduced model (`[M0 covariates]`) to the full model (`[M1 covariates]`) yields a deviance difference of [value] on [df_diff] degrees of freedom (p-value [value]). We [reject / fail to reject] $H_0$ that the additional covariates have no effect: at the [α]% level, `[var_x]` and `[var_y]` [jointly contribute / do not jointly contribute] to explaining the response, beyond what is already captured by the reduced model.
+
+---
 
 ## Selezione del modello e predizione
 
-<!-- Giorno 14: step su glm, predict type="response" -->
+### Selezione stepwise
+
+```{r logit-stepwise, eval=FALSE}
+library(MASS)
+
+# selezione stepwise basata su AIC (default)
+mod_step <- stepAIC(mod_full, direction = "both", trace = TRUE)
+
+# con BIC invece di AIC
+n <- nrow(df)
+mod_step_bic <- stepAIC(mod_full, direction = "both", k = log(n))
+
+summary(mod_step)
+```
+
+Il funzionamento di `stepAIC` è identico al caso della regressione lineare (vedi sezione Model selection).
+
+### Predizione delle probabilità
+
+```{r logit-predict, eval=FALSE}
+# nuova osservazione
+new_data <- data.frame(x1 = 25, x2 = "level_B", x3 = 1)
+
+# probabilità stimata di successo (SEMPRE type = "response")
+predict(mod_final, newdata = new_data, type = "response")
+
+# probabilità in-sample per tutto il dataset
+fitted_probs <- predict(mod_final, type = "response")
+
+# classificazione con soglia 0.5 e matrice di confusione
+predicted_class <- ifelse(fitted_probs > 0.5, 1, 0)
+table(predicted = predicted_class, observed = df$y)
+```
+
+| Tipo | Output | Comando R |
+|------|--------|-----------|
+| Logit | $\hat{\text{logit}}(p_i) = x'_i \hat\beta$ | `predict(mod, newdata)` (default) |
+| Probabilità | $\hat{p}_i \in [0, 1]$ | `predict(mod, newdata, type = "response")` |
+
+**Comment template:**
+
+> For a new unit with characteristics `[describe values]`, the estimated probability of `[success_event]` is $\hat{p} = [value]$. Under a 0.5 classification threshold, the unit is predicted as `[class 1 / class 0]`, indicating that the model considers it `[likely / unlikely]` to be a success.
+
+### Full comment template — coefficient discussion
+
+> The variable `[name]` has an estimated coefficient $\hat\beta = [value]$ on the logit scale, with z-statistic [value] and p-value [value]. The corresponding odds ratio is $\exp(\hat\beta) = [OR]$ with 95% CI $[L, U]$.
+>
+> Interpretation: [a one-unit increase in / membership in the reference group of] `[name]` is associated with a multiplicative change in the odds of [success] by a factor of [OR], holding other covariates constant. The CI [does not / does] include 1, confirming [the statistical significance / the lack of significance] of this effect at the 5% level.
+
+### Trappole comuni (regressione logistica)
+
+- **Wald test, non t-test**: il test su ogni coefficiente in `summary(glm)` è Wald con riferimento $\mathcal{N}(0,1)$. Valore critico al 5%: 1.96 esatto
+- **I coefficienti sulla scala logit non si interpretano**: esponenziare sempre per ottenere odds ratio
+- **IC per OR**: prendere `exp()` dell'IC del coefficiente. Non calcolare SE dell'OR direttamente
+- **Livello di riferimento**: R sceglie il primo livello alfabetico. Usare `relevel()` per controllare
+- **Per confronto modelli annidati usare $\chi^2$, non F**: `anova(M0, M1, test = "Chisq")`
+- **IC che include 1**: se l'IC per un OR include 1, la variabile NON è significativa
+- **Predire probabilità**: usare sempre `type = "response"`, altrimenti si ottengono logit
+
+### Confronto rapido: `lm` vs `glm`
+
+| Scenario | `lm` (lineare) | `glm` (logistico) |
+|----------|----------------|-------------------|
+| Test singolo coefficiente | t-test (esatto) | Wald test (asintotico, normale) |
+| Valore critico 5% | $t^*_{n-p-1, 0.975}$ (≈ 1.96 per $n$ grande) | 1.96 esatto |
+| IC singolo coefficiente | $\hat\beta \pm t^* \cdot SE$ | $\hat\beta \pm 1.96 \cdot SE$ |
+| Test globale | F-test (in summary) | Confronto null vs residual deviance |
+| Confronto modelli annidati | `anova(M0, M1)` → F-test | `anova(M0, M1, test = "Chisq")` → LRT |
+| Selezione automatica | `stepAIC(...)` | `stepAIC(...)` (identico) |
+| Predizione | `predict(mod, newdata)` | `predict(mod, newdata, type = "response")` |
+
+---
+
+# Clustering Model-Based (Ch. 13)
+
+## Quando usarlo
+
+Usa il clustering model-based quando:
+
+- Hai **dati continui senza etichette** (setting non supervisionato)
+- Vuoi **identificare sottogruppi** (cluster) con struttura distributiva potenzialmente diversa
+- Vuoi un approccio **probabilistico**: ogni unità ha una probabilità posteriore di appartenere a ogni cluster (non solo assegnazione hard)
+
+I dati si assumono provenienti da una **mistura finita di distribuzioni gaussiane**:
+
+$$f(x) = \sum_{k=1}^{K} \pi_k \cdot \mathcal{N}_p(x; \mu_k, \Sigma_k)$$
+
+dove $K$ è il numero di cluster, $\pi_k$ sono i pesi della mistura ($\sum_k \pi_k = 1$), e ogni cluster ha la propria media $\mu_k$ e covarianza $\Sigma_k$.
+
+---
+
+## Il framework mclust
+
+Il pacchetto `mclust` parametrizza le matrici di covarianza via decomposizione spettrale:
+
+$$\Sigma_k = \lambda_k D_k A_k D_k^\top$$
+
+- $\lambda_k$: scalare — controlla il **volume** del cluster
+- $D_k$: matrice ortogonale — controlla l'**orientazione**
+- $A_k$: matrice diagonale — controlla la **forma**
+
+I modelli sono codificati con **3 lettere** (volume, forma, orientazione):
+
+| Lettera | Significato |
+|---------|---------|
+| E | Uguale tra cluster |
+| V | Variabile tra cluster |
+| I | Identità / sferico |
+
+| Codice | Volume | Forma | Orientazione | Descrizione geometrica |
+|--------|--------|-------|-------------|------------------------|
+| **EII** | E | I | I | Cluster sferici, stessa dimensione |
+| **VII** | V | I | I | Cluster sferici, dimensioni diverse |
+| **EEI** | E | E | I | Cov. diagonale, allineata agli assi, stessa forma e volume |
+| **VVI** | V | V | I | Cov. diagonale, allineata agli assi, forme e volumi diversi |
+| **EEE** | E | E | E | Stesso ellissoide per tutti (solo le medie differiscono) |
+| **VVV** | V | V | V | Completamente flessibile — ogni cluster ha il proprio ellissoide |
+
+> **Trade-off**: da EII (più parsimonioso) a VVV (più flessibile). VVV può overfittare con $K$ grande o $n$ piccolo.
+
+---
+
+## Fit del modello con mclust
+
+```{r mclust-fit, eval=FALSE}
+library(mclust)
+
+# selezione automatica di K e modello basata su BIC
+mod_clust <- Mclust(df, G = 1:9)
+
+# output principali
+summary(mod_clust)              # info sintetica: modello, K, log-lik, BIC
+mod_clust$G                     # numero di cluster selezionato
+mod_clust$modelName             # codice modello (es. "VVV", "EEE")
+mod_clust$BIC                   # valori BIC per tutte le combinazioni K × modello
+mod_clust$classification        # assegnazione cluster per ogni unità (regola MAP)
+mod_clust$z                     # probabilità posteriori di appartenenza (matrice n × K)
+mod_clust$parameters$mean       # medie stimate per cluster
+mod_clust$parameters$variance   # struttura di covarianza stimata
+```
+
+### Lettura dell'output di summary
+
+```
+Mclust VVV (ellipsoidal, varying volume, shape, and orientation) model with 3 components:
+
+ log-likelihood   n df       BIC       ICL
+      -1234.56 200 27   -2598.6   -2615.3
+
+Clustering table:
+ 1   2   3
+65  92  43
+```
+
+- **Modello selezionato**: VVV con 3 cluster
+- **log-likelihood**: log-verosimiglianza massima alla convergenza dell'EM
+- **df**: numero di parametri stimati
+- **BIC**: criterio di selezione (in mclust **più alto è meglio** — convenzione opposta al solito)
+- **ICL**: Integrated Completed Likelihood (penalizza l'overlap tra cluster)
+- **Clustering table**: quante unità in ogni cluster
+
+---
+
+## Visualizzazione
+
+```{r mclust-plot, eval=FALSE}
+# plot multiplo: BIC, classificazione, incertezza, densità
+plot(mod_clust, what = "BIC")              # BIC vs K per ogni modello
+plot(mod_clust, what = "classification")   # scatterplot colorato per cluster
+plot(mod_clust, what = "uncertainty")      # incertezza nelle assegnazioni
+plot(mod_clust, what = "density")          # contorni della densità della mistura
+```
+
+### Interpretazione del BIC plot
+
+The BIC plot shows BIC values for all combinations of $K$ (x-axis) and model code (different lines). The optimal combination has the **highest BIC** (note: mclust reports BIC with the opposite sign convention — higher is better).
+
+**Comment template:**
+
+> The BIC plot indicates that the model `[code]` with $K = [value]$ clusters maximizes the BIC. Alternative models with similar BIC values include `[alternatives]`, suggesting that the cluster structure is [robust to / sensitive to] the choice of parameterization.
+
+---
+
+## Interpretazione e validazione dei cluster
+
+```{r cluster-stats, eval=FALSE}
+# dimensioni dei cluster
+table(mod_clust$classification)
+
+# medie per cluster
+mod_clust$parameters$mean
+
+# covarianze per cluster (per VVV: Sigma separata per ogni cluster)
+mod_clust$parameters$variance$sigma
+
+# descrivere ogni cluster su ogni variabile
+df$cluster <- mod_clust$classification
+aggregate(df[, -ncol(df)], by = list(df$cluster), FUN = mean)
+
+# incertezza nelle assegnazioni
+unc <- 1 - apply(mod_clust$z, 1, max)
+high_unc <- which(unc > 0.3)   # unità al confine tra cluster
+length(high_unc)
+```
+
+**Comment template:**
+
+> The model selected by mclust is `[code]` with $K = [value]$ clusters. Cluster sizes are: cluster 1 — [n1] units, cluster 2 — [n2] units, [...]. The clusters differ primarily in `[variable A]` (cluster 1 mean: [v1], cluster 2 mean: [v2]) and in `[variable B]` (cluster 1 mean: [v1], cluster 2 mean: [v2]).
+>
+> The geometric structure `[code description, e.g., VVV = ellipsoids with varying volume, shape, and orientation]` indicates that the clusters [have similar / have different] internal structure. [Optional: [X]% of units show high uncertainty in their assignment (> 0.3), suggesting they lie on cluster boundaries.]
+
+---
+
+## Confronto BIC vs ICL
+
+| Criterio | Cosa premia | Quando usarlo |
+|----------|------------|---------------|
+| **BIC** | Verosimiglianza + parsimonia | Scopo predittivo / descrittivo |
+| **ICL** | Come BIC, ma penalizza l'overlap tra cluster | Quando si vuole separazione netta (classificazione) |
+
+Se due modelli hanno BIC simile ma ICL molto diverso, significa che uno ha cluster molto più sovrapposti dell'altro.
+
+---
+
+## Trappole comuni (clustering)
+
+- **Standardizzare le variabili prima** del clustering se hanno scale molto diverse — altrimenti la variabile con il range maggiore domina la struttura di $\Sigma$
+  ```{r scale-before-mclust, eval=FALSE}
+  df_std <- scale(df)
+  mod <- Mclust(df_std)
+  ```
+- **Convenzione BIC di mclust**: in mclust **BIC più alto è meglio** (opposto rispetto a `lm`/`glm`). Non confondersi
+- **L'EM può convergere a massimi locali**: mclust testa automaticamente più inizializzazioni, ma è bene saperlo
+- **Non pre-specificare K rigidamente**: usare `Mclust(df, G = 1:9)` per esplorare
+- **VVV può overfittare con pochi dati**: con poche osservazioni per cluster, preferire EEE o EEI per evitare stime di varianza instabili
+- **Variabili categoriali**: `mclust` è progettato per variabili continue. Per dati misti usare solo le continue, o valutare approcci alternativi
 
 ---
 
