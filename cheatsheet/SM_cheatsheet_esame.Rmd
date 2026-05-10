@@ -43,6 +43,8 @@ library(GGally)
 library(mvtnorm)
 library(ggplot2)
 library(skimr)
+library(gridExtra)
+
 ```
 
 ## Import dati tipico
@@ -1327,11 +1329,43 @@ Questa è la **funzione logistica** — una curva a S da 0 a 1.
 
 ---
 
+### What are the logits
+
+In this study, the logit represents the logarithm of the odds of [SUCCESS_EVENT] 
+versus [FAILURE_EVENT], modeled as a linear function of the available covariates:
+
+$$
+\text{logit}(p_i) = \log\left(\frac{p_i}{1 - p_i}\right) 
+= \log\left(\frac{P(Y_i = \text{[success_label]})}{P(Y_i = \text{[failure_label]})}\right)
+$$
+
+where $p_i = P(Y_i = \text{[success_label]})$ is the probability that individual $i$ 
+[describe success event in plain language].
+
+The logistic regression model assumes the logit to be a linear function of the 
+covariates [list covariates]:
+
+$$
+\text{logit}(p_i) = \beta_0 + \beta_1 \cdot \text{[covariate1]}_i + \beta_2 \cdot \text{[covariate2]}_i + \dots
+$$
+
+While probabilities $p_i$ are bounded in $[0, 1]$ and odds $p_i / (1 - p_i)$ in 
+$[0, +\infty)$, the logit transformation maps these quantities to the entire real 
+line $(-\infty, +\infty)$, making linear modeling with arbitrary covariate values 
+appropriate. The estimated coefficients $\hat\beta_k$ describe how the log-odds 
+of [success_event] change with a one-unit increase in the corresponding covariate, 
+holding all others constant.
+
+
 ## Fit con `glm` e lettura del summary
 
 ### Setup e analisi esplorative
 
 ```{r logit-setup, eval=FALSE}
+# remove rows with NA on covariates of interest
+urine_clean <- urine[complete.cases(urine[, c("r", "osmo", "cond")]), ]
+nrow(urine_clean)
+
 # assicurarsi che la risposta sia un factor con livelli corretti
 df$y <- as.factor(df$y)
 levels(df$y)                        # il primo livello è il riferimento (= "failure" / 0)
