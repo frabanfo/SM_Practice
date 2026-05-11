@@ -1,0 +1,90 @@
+---
+title: "RegressionExercises"
+author: "me"
+date: "2026-05-08"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 6,
+  fig.height = 4,
+  fig.align = "center"
+)
+```
+
+
+```{r}
+# Caricamento librerie usate nel corso
+library(MASS)       # stepAIC, Boston dataset
+library(car)        # vif, diagnostica
+library(corrplot)   # visualizzazione matrici di correlazione
+```
+
+
+```{r}
+library(boot)       # bootstrap
+library(ppcor)      # correlazioni parziali
+library(GGally) 
+library(mvtnorm)
+library(ggplot2)
+library(skimr)
+```
+```{r}
+load("data/ratings.Rdata")
+```
+
+
+```{r}
+skimr::skim_without_charts(ratings)
+```
+
+##14.1 Research question:
+
+The main objective is to model how the credit rating of a firm depends on three key financial indicators: profitability, capital structure, and financial flexibility. Specifically, we aim to:
+
+- Quantify the effect of each financial indicator on the firm's rating, holding the others constant
+- Test which covariates are statistically significant predictors of the rating
+- Predict the expected rating for new firms based on their financial characteristics
+
+We expect all three covariates to be positively associated with the rating: more profitable firms, with stronger capital structure and higher financial flexibility, should receive higher credit ratings. The analysis will verify whether this is supported by the data and quantify the magnitude of each effect
+
+
+##14.2Fit a multiple linear regression model. Report the results obtained using the summary function.
+```{r}
+model = lm(rating~ ., data= ratings)
+summary(model)
+```
+The estimated model is $\hat{Y} = {-28.88} + 0.33*\ profit + 3.91*\ capital + 19.67*\ fflex $. As expected, all coefficients are positive, consistent with our hypothesis that profit, capital structure, and financial flexibility are positively associated with the rating. The magnitude and statistical significance of each effect are discussed below. 
+The summary statistics of the residuals provide a first indication of the model's quality and of the validity of the underlying assumptions.
+The residuals range from −17.39 to +25.45, with median −1.01 that is close to zero, as expected for a regression model with intercept. The interquartile range [−6.61,4.91]
+is centered approximately around zero, suggesting that the bulk of the residuals is reasonably symmetric around the fitted values. However, the maximum residual (25.45) is noticeably larger in absolute value than the minimum (−17.39), indicating a slight positive asymmetry in the residual distribution. 
+Looking at the coefficients, we see that according to the t-test the significative variables at the 0.05 level are the capital and f_flex, having a p-value of 0.004 and 0.031. It can be interpreted as: a unit increase in these variables is associated with an average change of the rating of 19.67 points, holding all of the other variables constant. The coefficient of profit is positive (β^1=0.33) but not statistically significant at conventional levels (p-value > 0.05). This may suggest that, after controlling for capital and f_flex, profit does not add significant explanatory power — possibly due to correlation with the other financial indicators. This will be further investigated through the VIF analysis.
+The model explains 0.65 of the variance in the response, according to the R squared coefficient, and 0.61 according to the adjusted one. The slightly lower value of the adjusted R² reflects the penalty for the number of parameters in the model: this penalty is appropriate when some covariates may not contribute substantially to the fit. The F-test statistic is 16.22 with a very small p-value indicating that at least one covariate is significantly associated with Y.
+
+## 14.3 Write the equation of the estimated model for the unit with ID 29. Interpret the values.
+
+$\hat{Y} = {-28.88} + 0.33 * 5.247 + 3.91 * 6.174 + 19.67 * 1.6 $
+
+\hat{Y} = 28.46 predicted when the actual rating specified is 18. It has a residual of ~ -10 units, that indicates that the model sovrastimates the value of the rating by around ten points. We can also say that this result is lined up with the results we got from the summary that was taken before with a RSE of 10.13.
+
+
+## 14.4 , 5, 6,7 done in other answers
+
+##14.8 Check whether the assumptions (properties) of the residual are satisfied based on your results.
+The validity of the linear regression model relies on several assumptions regarding the residuals, namely zero mean, homoscedasticity, normality, and independence.
+
+First, the residuals appear to be well centered around zero, as indicated by the median value (−1.01) being close to zero. This suggests that the assumption E[ϵ]=0 is reasonably satisfied.
+
+Regarding normality, the residuals range from −17.39 to 25.45, with a slightly longer positive tail. This indicates a mild positive asymmetry, but no strong deviations from symmetry are observed. Overall, the normality assumption appears to be approximately satisfied, although minor departures in the tails may be present.
+
+Concerning homoscedasticity, no clear evidence of heteroscedasticity emerges from the residual summary. The spread of residuals is relatively stable, and the residual standard error (10.13) provides a consistent measure of unexplained variability across observations. However, a formal graphical analysis (e.g., residuals vs fitted values plot) would be required to fully confirm this assumption.
+
+In terms of outliers, the largest residual (25.45) and smallest residual (−17.39) are not excessively large relative to the residual standard error. Since no residual clearly exceeds two to three times the RSE, there is no strong evidence of extreme outliers or highly influential observations based on this information alone.
+
+Finally, independence of errors cannot be directly assessed from the available output. However, given the nature of the data and the absence of any structural pattern indication, no obvious violation is suggested.
+
+Overall, the diagnostic evidence suggests that the assumptions of the linear regression model are reasonably satisfied, with only minor deviations from normality and no major concerns regarding model validity.

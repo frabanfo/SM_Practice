@@ -1,0 +1,70 @@
+---
+title: "Mixture_models"
+author: "me"
+date: "2026-05-08"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 6,
+  fig.height = 4,
+  fig.align = "center"
+)
+```
+
+Consider the data in the file called haemoglobin.Rdata. These are measurements
+observed for 70 individuals of a plasma component. Assuming the presence of potential groups of individuals with distinct values of this component, we aim to estimate
+these latent subpopulations.
+
+##32.1 Describe the data using descriptive statistics and graphical displays.
+
+```{r}
+library(boot)       # bootstrap
+library(ppcor)      # correlazioni parziali
+library(GGally) 
+library(mvtnorm)
+library(ggplot2)
+library(skimr)
+library(mclust)
+```
+
+skip...
+
+
+##32.2 Estimate a finite mixture model using the mclust package, performing model selection to choose the suitable number of clusters and the most parsimonious parameterization of the component variances through the Bayesian Information Criterion.
+
+model selection : 2 points
+1) choose the suitable number of clusters
+2) Evaluate the quality/validity of the clustering solution
+
+```{r}
+mclustBIC(haemoglobin, modelNames = c("E", "V"))
+```
+Top 3 model according to BIC:
+1) Best model is the one Equal structure of the variability (both components share the same variability) with 2 component BIC = -822.59
+2) Equal varaibility 1 component BIC = ..
+3) Different variability 1 component BIC = ..
+
+It is interesting that the second best model is a single gaussian distribution and it is not so far in results from the Mixture Model. 
+
+```{r}
+mod.sel = Mclust(haemoglobin, G = 2, modelNames = "E")
+summary(mod.sel, parameter = TRUE)
+
+```
+
+clustering table - refers to the sample
+mixing probabilities - refer to the population (we are doing inference)
+
+```{r}
+plot(mod.sel ,what = "classification")
+```
+
+```{r}
+plot(mod.sel, what = "density")
+```
+

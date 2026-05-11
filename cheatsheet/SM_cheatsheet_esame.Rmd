@@ -1309,7 +1309,7 @@ Usa la regressione logistica quando la **risposta è binaria** ($Y \in \{0, 1\}$
 - Gli errori non sono normali (seguono una Bernoulli)
 - La varianza non è costante: $\text{Var}(Y_i) = p_i(1 - p_i)$ dipende da $p_i$ (eteroschedasticità intrinseca)
 
-### La trasformazione logit
+## La trasformazione logit
 
 | Quantità | Formula | Range |
 |----------|---------|-------|
@@ -1327,62 +1327,139 @@ $$p_i = \frac{\exp(\beta_0 + \beta_1 x_{i1} + \dots)}{1 + \exp(\beta_0 + \beta_1
 
 Questa è la **funzione logistica** — una curva a S da 0 a 1.
 
+## Workflow checklist
+
+Per qualsiasi esercizio di regressione logistica, segui questo ordine:
+
+1. **Setup**: caricamento dati, gestione NA, conversione della risposta a factor
+2. **EDA**: descrittive per livello di risposta, contingency tables o boxplot
+3. **What are the logits**: rispondi (se richiesto) o tienilo a mente
+4. **Fit**: `glm(y ~ x1 + x2 + ..., family = binomial, data = df)`
+5. **Lettura summary**: Wald test, null/residual deviance, AIC
+6. **Selezione**: `stepAIC()` se richiesto
+7. **Interpret coefficients**: odds ratio $\exp(\hat\beta_k)$ con CI
+8. **Predict**: probabilità per nuove unità con `type = "response"`
+9. **Compare nested models** (opzionale): `anova(M0, M1, test = "Chisq")`
+
 ---
 
-### What are the logits
+## Step 1 — Setup
 
-In this study, the logit represents the logarithm of the odds of [SUCCESS_EVENT] 
-versus [FAILURE_EVENT], modeled as a linear function of the available covariates:
+```{r logit-setup, eval=FALSE}
+# remove rows with NA on covariates of interest
+df_clean <- df[complete.cases(df[, c("y", "x1", "x2")]), ]
+nrow(df_clean)
+
+# response as factor with proper levels
+df_clean$y <- as.factor(df_clean$y)
+levels(df_clean$y)                  # first level = reference (= "failure" / 0)
+
+# if needed, change the reference level
+df_clean$y <- relevel(df_clean$y, ref = "no")   # "no" becomes reference
+
+# verify
+table(df_clean$y)
+```
+
+---
+
+## Step 2 — Exploratory Analysis
+
+### Case A: Continuous covariates
+
+```{r eda-continuous, eval=FALSE}
+require(gridExtra)
+require(ggplot2)
+
+p1 <- ggplot(df, aes(x = response, y = covariate1)) +
+  geom_boxplot(aes(fill = response), col = "black") +
+  geom_point(aes(col = response)) +
+  xlab("[response label]") + ylab("[covariate1 label]") +
+  scale_fill_manual(values = c("#ffe5ab", "#cce8f8")) +
+  scale_color_manual(values = c("#E69F00", "#56B4E9")) +
+  theme_bw()
+
+p2 <- ggplot(df, aes(x = response, y = covariate2)) +
+  geom_boxplot(aes(fill = response), col = "black") +
+  geom_point(aes(col = response)) +
+  xlab("[response label]") + ylab("[covariate2 label]") +
+  scale_fill_manual(values = c("#ffe5ab", "#cce8f8")) +
+  scale_color_manual(values = c("#E69F00", "#56B4E9")) +
+  theme_bw()
+
+grid.arrange(p1, p2, ncol = 2)
+
+# summary statistics by response level
+by(df[, c("covariate1", "covariate2")], df$response, summary)
+```
+
+**Comment template (continuous covariates):**
+
+Since all covariates in this study are continuous, the descriptive analysis focuses on numerical summaries and boxplots by response level — the analogue of contingency tables for categorical covariates.
+
+Looking at `[covariate1]`, subjects with `[success_event]` show, on average, [higher / lower / similar] values than those with `[failure_event]`. In particular, the median of `[covariate1]` is `[value_success]` for the `[success]` group and `[value_failure]` for the `[failure]` group, suggesting that [interpretation in context]. The interquartile range is also `[wider / narrower]` in the `[success / failure]` group, indicating [more / less] variability in this subgroup.
+
+Regarding `[covariate2]`, the medians are `[similar / different]` between groups (`[value]` vs `[value]`), but the distributions differ in `[describe: shape / spread / tails]`. Specifically, the first quartile is `[Q1_success]` for `[success]` and `[Q1_failure]` for `[failure]`, suggesting that [interpretation].
+
+These preliminary observations suggest that `[covariate1]` is likely to be [more / less] strongly associated with the response than `[covariate2]`. This hypothesis will be formally assessed via the logistic regression model.
+
+### Case B: Binary covariates
+
+```{r eda-binary, eval=FALSE}
+# contingency tables (absolute frequencies)
+table(df$response, df$binary_cov1)
+
+# relative frequencies (by column = within each level of the covariate)
+round(prop.table(table(df$response, df$binary_cov1), margin = 2), 3)
+
+# barplot for visualization
+ggplot(df, aes(x = binary_cov1, fill = response)) +
+  geom_bar(position = "fill") +
+  ylab("Proportion") +
+  xlab("[binary covariate label]") +
+  scale_fill_manual(values = c("#ffe5ab", "#cce8f8")) +
+  theme_bw() +
+  ggtitle("[Response] by [binary covariate]")
+```
+
+**Comment template (binary covariates):**
+
+The contingency table for `[response]` vs `[binary_cov1]` shows that `[n_success_in_group1]` out of `[total_group1]` subjects with `[binary_cov1] = 1` have `[success_event]` (`[X]%`), compared to `[n_success_in_group0]` out of `[total_group0]` (`[Y]%`) in those with `[binary_cov1] = 0`. The substantial [difference / similarity] in proportions suggests that `[binary_cov1]` is [likely / unlikely] to be associated with the response.
+
+A preliminary inspection thus suggests that `[binary_cov1]` and `[binary_cov2]` [show / do not show] association with `[response]`, but the magnitude and statistical significance of each effect will be formally assessed via the logistic regression model, which also accounts for the joint effect of all covariates simultaneously.
+
+### Case C: Mixed (binary + continuous)
+
+Use this opening sentence:
+
+Since the available covariates are of mixed types — `[list binary]` are binary indicators while `[list continuous]` are continuous variables — the exploratory analysis uses different tools for each: contingency tables for the binary covariates and boxplots/numerical summaries by response level for the continuous ones.
+
+Then write a paragraph for each covariate using the appropriate template from Cases A or B above.
+
+---
+
+## Step 3 — What are the logits (template)
+
+In this study, the logit represents the logarithm of the odds of [SUCCESS_EVENT] versus [FAILURE_EVENT], modeled as a linear function of the available covariates:
 
 $$
 \text{logit}(p_i) = \log\left(\frac{p_i}{1 - p_i}\right) 
 = \log\left(\frac{P(Y_i = \text{[success_label]})}{P(Y_i = \text{[failure_label]})}\right)
 $$
 
-where $p_i = P(Y_i = \text{[success_label]})$ is the probability that individual $i$ 
-[describe success event in plain language].
+where $p_i = P(Y_i = \text{[success_label]})$ is the probability that individual $i$ [describe success event in plain language].
 
-The logistic regression model assumes the logit to be a linear function of the 
-covariates [list covariates]:
+The logistic regression model assumes the logit to be a linear function of the covariates [list covariates]:
 
 $$
 \text{logit}(p_i) = \beta_0 + \beta_1 \cdot \text{[covariate1]}_i + \beta_2 \cdot \text{[covariate2]}_i + \dots
 $$
 
-While probabilities $p_i$ are bounded in $[0, 1]$ and odds $p_i / (1 - p_i)$ in 
-$[0, +\infty)$, the logit transformation maps these quantities to the entire real 
-line $(-\infty, +\infty)$, making linear modeling with arbitrary covariate values 
-appropriate. The estimated coefficients $\hat\beta_k$ describe how the log-odds 
-of [success_event] change with a one-unit increase in the corresponding covariate, 
-holding all others constant.
+While probabilities $p_i$ are bounded in $[0, 1]$ and odds $p_i / (1 - p_i)$ in $[0, +\infty)$, the logit transformation maps these quantities to the entire real line $(-\infty, +\infty)$, making linear modeling with arbitrary covariate values appropriate. The estimated coefficients $\hat\beta_k$ describe how the log-odds of [success_event] change with a one-unit increase in the corresponding covariate, holding all others constant.
 
+---
 
-## Fit con `glm` e lettura del summary
-
-### Setup e analisi esplorative
-
-```{r logit-setup, eval=FALSE}
-# remove rows with NA on covariates of interest
-urine_clean <- urine[complete.cases(urine[, c("r", "osmo", "cond")]), ]
-nrow(urine_clean)
-
-# assicurarsi che la risposta sia un factor con livelli corretti
-df$y <- as.factor(df$y)
-levels(df$y)                        # il primo livello è il riferimento (= "failure" / 0)
-
-# se necessario, cambiare il livello di riferimento
-df$y <- relevel(df$y, ref = "no")   # "no" diventa riferimento, "yes" è il successo
-
-# tabella risposta vs covariata categoriale
-table(df$y, df$x_cat)
-prop.table(table(df$y, df$x_cat), margin = 2)   # frequenze relative per colonna
-
-# statistiche descrittive delle continue per livello di risposta
-by(df[, c("x1", "x2")], df$y, summary)
-boxplot(x1 ~ y, data = df, col = c("lightblue", "salmon"))
-```
-
-### Fit del modello
+## Step 4 — Fit del modello
 
 ```{r logit-fit, eval=FALSE}
 mod1 <- glm(y ~ x1 + x2 + x3,
@@ -1392,7 +1469,9 @@ mod1 <- glm(y ~ x1 + x2 + x3,
 summary(mod1)
 ```
 
-### Lettura del summary
+---
+
+## Step 5 — Lettura del summary
 
 ```
 Coefficients:
@@ -1414,93 +1493,67 @@ AIC: 253.8
 - La riduzione da null a residual deviance misura il miglioramento dovuto alle covariate
 - **AIC** per confronto tra modelli
 
-**Comment template:**
+### Comment template — summary completo
 
-> The estimated logistic regression model is:
->
-> $\text{logit}(\hat{p}_i) = [\beta_0] + [\beta_1] \cdot \text{[var1]} + [\beta_2] \cdot \text{[var2]} + \dots$
->
-> The Wald test indicates that `[variable]` is statistically significant at the [α]% level (z = [value], p-value [value]). `[Variable_no]` is not significant (p-value > 0.05), suggesting that, after controlling for the other covariates, it does not add explanatory power for predicting the response.
->
-> The null deviance is [value] on [df_null] degrees of freedom; the residual deviance is [value] on [df_res] degrees of freedom — a reduction of [diff], indicating that the included covariates [substantially / modestly] improve the fit compared to the null model. The AIC of the model is [value].
+**Block 1 — Estimated model equation**
 
----
+The estimated logistic regression model is:
 
-## Odds ratio e interpretazione
+$$
+\text{logit}(\hat p_i) = [\hat\beta_0] + [\hat\beta_1] \cdot \text{[var1]}_i + [\hat\beta_2] \cdot \text{[var2]}_i + \dots
+$$
 
-Questo è il punto **più importante** di ogni analisi logistica. I coefficienti sulla scala logit non si interpretano direttamente — vanno trasformati.
+**Block 2 — Intercept comment**
 
-```{r odds-ratios, eval=FALSE}
-# odds ratio (stime puntuali)
-exp(coef(mod1))
+The **intercept** ($\hat\beta_0 = [value]$) is [statistically significant / not statistically significant] at the [α]% level (z = [value], p-value = [value]). It represents the log-odds of [success_event] for an individual with all covariates equal to zero. Since this combination is [observed / outside the observed range / not meaningful in context], the intercept [has / does not have] a substantive interpretation.
 
-# IC 95% per gli odds ratio (asintotico, veloce)
-exp(confint.default(mod1))
+**Block 3 — Single coefficient interpretation (repeat for each covariate)**
 
-# IC 95% basato su profile likelihood (più accurato, lento)
-exp(confint(mod1))
+The coefficient of **`[covariate]`** ($\hat\beta_k = [value]$) is [positive / negative] and **[statistically significant at the [α]% level / not statistically significant]** (z = [value], p-value = [value]).
 
-# tabella compatta
-cbind(
-  OR = exp(coef(mod1)),
-  exp(confint.default(mod1))
-)
-```
+This indicates that `[covariate]` is [positively / negatively] associated with the probability of [success_event]: [higher / lower] values of `[covariate]` correspond to [higher / lower] odds of [success_event], holding the other covariates constant. The corresponding odds ratio is $\exp([value]) \approx [OR]$, meaning that a one-unit increase in `[covariate]` multiplies the odds by a factor of [OR] — equivalently, the odds [increase / decrease] by approximately [|OR-1|·100]% per unit increase.
 
-### Regole di interpretazione
+[Optional: contextualize using the natural range of the variable]
 
-| Quantità | Cosa rappresenta |
-|----------|--------------------|
-| $\exp(\hat\beta_0)$ | Odds di successo quando tutte le covariate sono zero |
-| $\exp(\hat\beta_k)$ per $x_k$ continua | Cambiamento **moltiplicativo** degli odds per un aumento di un'unità in $x_k$, a parità di covariate |
-| $\exp(\hat\beta_k)$ per $x_k$ binaria | Rapporto tra gli odds dei due gruppi, a parità di covariate |
-| $\exp(\hat\beta_k) > 1$ | $x_k$ **aumenta** gli odds di successo |
-| $\exp(\hat\beta_k) < 1$ | $x_k$ **riduce** gli odds di successo |
-| $\exp(\hat\beta_k) = 1$ | Nessun effetto (IC che include 1 → non significativo) |
+Although this effect appears [small / moderate / large] per unit, the natural range of `[covariate]` in the sample ([range]) implies a substantial cumulative effect across the observed values.
 
-### Conversione rapida: variazione percentuale degli odds
+**Block 4 — For non-significant coefficients**
 
-$$\text{variazione \%} = (\exp(\hat\beta_k) - 1) \cdot 100\%$$
+The coefficient of `[covariate]` ($\hat\beta_k = [value]$) is **not statistically significant** at conventional levels (z = [value], p-value > 0.05). After controlling for the other covariates in the model, `[covariate]` does not appear to contribute significantly to explaining the response. This may reflect [multicollinearity with another covariate / limited variation in the sample / a genuinely small effect that the current sample size cannot detect].
 
-- $\exp(\hat\beta_k) = 1.05$ → "gli odds aumentano del 5%"
-- $\exp(\hat\beta_k) = 1.50$ → "gli odds aumentano del 50%"
-- $\exp(\hat\beta_k) = 0.80$ → "gli odds diminuiscono del 20%"
+**Block 5 — Goodness of fit**
 
-**Comment template:**
+Regarding the **goodness of fit**, the null deviance is $[null\_dev]$ on $[df\_null]$ degrees of freedom, while the residual deviance is $[res\_dev]$ on $[df\_res]$ degrees of freedom — a reduction of $[null\_dev - res\_dev]$ on $[df\_null - df\_res]$ degrees of freedom. This reduction suggests that the included covariates [substantially / modestly / marginally] improve the fit compared to the null model (intercept only). The AIC of the fitted model is $[AIC]$.
 
-> The estimated odds ratio for `[variable]` is $\exp(\hat\beta) = [value]$, with 95% CI $[L, U]$. Since the CI [does not / does] include 1, the effect of `[variable]` on the odds of success is [statistically significant / not significant] at the 5% level.
->
-> Specifically, a one-unit increase in `[variable]` is associated with a multiplicative change in the odds of [success_event] by a factor of [value], holding the other covariates constant. Equivalently, the odds [increase / decrease] by [|exp(β) - 1|·100]% per unit increase in `[variable]`.
+**Block 6 — Convergence note**
 
-For a **binary covariate** (e.g., `smoke = 1 vs 0`):
+The Fisher Scoring algorithm converged in $[n]$ iterations, confirming the absence of numerical issues during maximum likelihood estimation.
 
-> The estimated odds ratio for smokers vs non-smokers is $\exp(\hat\beta_{smoke}) = [value]$. Holding other covariates constant, smokers have odds of [outcome] that are [value] times those of non-smokers. The 95% CI is $[L, U]$, [not] including 1, confirming [the presence / the absence] of a significant association.
+**Block 7 — Summary and transition**
+
+Overall, [number] out of [total] covariates show a statistically significant association with [response]: [briefly summarize signs and directions]. The next step is to [compute confidence intervals for the odds ratios / perform model selection / evaluate predicted probabilities].
 
 ---
 
-## Inferenza: intervalli di confidenza e test
+## Step 6 — Model selection con `stepAIC`
 
-### Likelihood Ratio Test per modelli annidati
+### AIC and BIC — teoria
 
-```{r lrt, eval=FALSE}
-mod_reduced <- glm(y ~ x1, data = df, family = binomial)
-mod_full    <- glm(y ~ x1 + x2 + x3, data = df, family = binomial)
+The **Akaike Information Criterion (AIC)** is a criterion used for model selection that balances the goodness of fit of a model with its complexity. It is defined as:
 
-# LRT (chi-quadro): usare "Chisq", NON F-test come in lm()
-anova(mod_reduced, mod_full, test = "Chisq")
-```
+$$
+\text{AIC} = -2 \log L(\hat\theta) + 2k
+$$
 
-La statistica è la **differenza di deviance** $D = 2[\ell(M_1) - \ell(M_0)]$, distribuita come $\chi^2_{p_1 - p_0}$ sotto $H_0$.
+where $\log L(\hat\theta)$ is the maximized log-likelihood of the model and $k$ is the number of estimated parameters. The first term rewards models that fit the data well (higher log-likelihood means lower $-2\log L$), while the second term penalizes models with many parameters, discouraging overfitting.
 
-**Comment template:**
+Lower values of AIC indicate a better trade-off between fit and parsimony. AIC is **always used to compare models on the same dataset**, never interpreted in absolute terms. Among a set of candidate models, the one with the smallest AIC is preferred.
 
-> The likelihood ratio test comparing the reduced model (`[M0 covariates]`) to the full model (`[M1 covariates]`) yields a deviance difference of [value] on [df_diff] degrees of freedom (p-value [value]). We [reject / fail to reject] $H_0$ that the additional covariates have no effect: at the [α]% level, `[var_x]` and `[var_y]` [jointly contribute / do not jointly contribute] to explaining the response, beyond what is already captured by the reduced model.
+AIC is derived from information theory: it is an estimator of the expected Kullback-Leibler divergence between the fitted model and the true (unknown) data-generating process. Its objective is therefore predictive — it aims to identify the model that would best predict new, unseen data.
 
----
+A closely related criterion is the **Bayesian Information Criterion (BIC)**, defined as $-2 \log L(\hat\theta) + k \log n$. The penalty is larger than that of AIC whenever $\log n > 2$ (i.e. for any sample size $n > 7$, virtually always in practice), so BIC tends to select more parsimonious models. The two criteria have different philosophical foundations: BIC asymptotically identifies the "true" model (if one exists in the candidate set), while AIC is asymptotically optimal for prediction.
 
-## Selezione del modello e predizione
-
-### Selezione stepwise
+### Codice R
 
 ```{r logit-stepwise, eval=FALSE}
 library(MASS)
@@ -1515,9 +1568,137 @@ mod_step_bic <- stepAIC(mod_full, direction = "both", k = log(n))
 summary(mod_step)
 ```
 
-Il funzionamento di `stepAIC` è identico al caso della regressione lineare (vedi sezione Model selection).
+### Lettura del trace output
 
-### Predizione delle probabilità
+```
+Start:  AIC=99.38
+r ~ osmo + cond
+
+         Df Deviance    AIC
+<none>         93.38  99.38     ← current model
+- cond    1   99.41 103.41      ← removing cond would raise AIC
+- osmo    1  103.05 107.05      ← removing osmo would raise AIC even more
+```
+
+- La riga `<none>` mostra il modello corrente e il suo AIC
+- Ogni riga `- variable` mostra cosa succederebbe rimuovendo quella variabile
+- Se qualche riga `- variable` ha AIC più basso di `<none>`, quella variabile viene rimossa
+- La procedura si ferma quando nessuna rimozione o aggiunta migliora l'AIC
+
+### Comment template — modello finale = modello pieno
+
+Stepwise selection based on AIC was performed starting from the full model containing `[list initial covariates]`. The procedure considered both forward and backward steps at each iteration. The final selected model includes all initial covariates `[list]` with AIC = $[value]$, indicating that no removal of any covariate would improve the criterion. This suggests that all covariates contribute meaningfully to the model fit, in agreement with the significance levels of the individual Wald tests reported in the previous summary.
+
+### Comment template — variabili rimosse
+
+Stepwise selection based on AIC was performed starting from the full model with `[p]` covariates: `[list initial covariates]`. At each iteration the procedure evaluated both forward and backward moves, retaining the candidate that minimized the AIC.
+
+At step 1, the variable `[removed_var]` was removed, lowering the AIC from $[AIC_before]$ to $[AIC_after]$. At step 2, `[next_removed]` was further removed, [continue as needed]. The procedure terminated when no further removal or addition improved the criterion.
+
+The **final selected model** includes `[final covariates]` with AIC = $[AIC_final]$, considerably lower than the initial AIC of $[AIC_full]$. The removed covariates — `[removed list]` — did not provide enough explanatory power to justify their inclusion in the model.
+
+This result is consistent with the Wald tests reported in the full model summary: the removed covariates had p-values [larger than conventional thresholds / inconsistent significance], suggesting limited individual contributions after controlling for the others.
+
+### Summary del modello finale
+
+After selection, refit / inspect the final model:
+
+```{r final-model, eval=FALSE}
+summary(mod_step)
+```
+
+The summary of the selected model is reported above. The coefficients are [describe: all significant / a mix of significant and not]. The AIC ($[final\_AIC]$) confirms the gain in parsimony obtained from the selection. The estimated equation of the final model is:
+
+$$\text{logit}(\hat p_i) = [\hat\beta_0] + [\hat\beta_1] \cdot \text{[var1]} + \dots$$
+
+The next steps will be to interpret each coefficient via odds ratios with confidence intervals, and to compute predicted probabilities for new observations.
+
+---
+
+## Step 7 — Confidence intervals e odds ratio
+
+In regressione logistica, "confidence interval" può riferirsi a **due quantità diverse** a seconda della scala. Specifica sempre quale stai usando.
+
+### CI sulla scala logit (per $\beta_k$)
+
+L'intervallo di valori plausibili per il **vero coefficiente sulla scala dei log-odds**.
+
+$$
+\hat\beta_k \pm 1.96 \cdot SE(\hat\beta_k)
+$$
+
+```{r ci-logit, eval=FALSE}
+confint.default(mod)     # asymptotic Wald CI (fast)
+confint(mod)              # profile-likelihood CI (more accurate, slower)
+```
+
+Raramente commentato in isolamento — i log-odds sono poco interpretabili.
+
+### CI sulla scala dell'odds ratio (per $\exp(\beta_k)$) — quello da commentare
+
+L'intervallo di valori plausibili per l'**effetto moltiplicativo sugli odds**.
+
+$$
+\left[\exp(\hat\beta_k - 1.96 \cdot SE),\; \exp(\hat\beta_k + 1.96 \cdot SE)\right]
+$$
+
+```{r ci-or, eval=FALSE}
+exp(confint.default(mod))      # OR CI (Wald)
+exp(confint(mod))               # OR CI (profile likelihood)
+
+# clean table with point estimate + CI
+cbind(OR = exp(coef(mod)), exp(confint.default(mod)))
+```
+
+### Interpretation table
+
+| Observation | Conclusion |
+|-------------|------------|
+| CI for OR excludes 1 | Effect is statistically significant at 5% |
+| CI for OR includes 1 | Effect is NOT significant (equivalent to p > 0.05) |
+| CI for OR very wide | Imprecise estimate (small sample / multicollinearity) |
+| CI for OR includes very different values (e.g. [0.5, 5]) | Direction of effect uncertain |
+
+### Perché 1.96 (non il valore critico della t)
+
+Unlike linear regression, where the test statistic follows Student's t with $n-p-1$ degrees of freedom, the Wald test in logistic regression follows the standard normal distribution **asymptotically**. The 95% critical value is therefore exactly 1.96 (not approximately). For small $n$ or sparse data, this asymptotic approximation can be unreliable; in those cases, prefer profile-likelihood CIs via `confint(mod)` or use likelihood ratio tests via `anova(mod0, mod1, test = "Chisq")`.
+
+### Regole di interpretazione degli OR
+
+| Quantità | Cosa rappresenta |
+|----------|--------------------|
+| $\exp(\hat\beta_0)$ | Odds di successo quando tutte le covariate sono zero |
+| $\exp(\hat\beta_k)$ per $x_k$ continua | Cambiamento **moltiplicativo** degli odds per un aumento di un'unità in $x_k$, a parità di covariate |
+| $\exp(\hat\beta_k)$ per $x_k$ binaria | Rapporto tra gli odds dei due gruppi, a parità di covariate |
+| $\exp(\hat\beta_k) > 1$ | $x_k$ **aumenta** gli odds di successo |
+| $\exp(\hat\beta_k) < 1$ | $x_k$ **riduce** gli odds di successo |
+| $\exp(\hat\beta_k) = 1$ | Nessun effetto (CI che include 1 → non significativo) |
+
+### Conversione rapida: variazione percentuale degli odds
+
+$$\text{variazione \%} = (\exp(\hat\beta_k) - 1) \cdot 100\%$$
+
+- $\exp(\hat\beta_k) = 1.05$ → "gli odds aumentano del 5%"
+- $\exp(\hat\beta_k) = 1.50$ → "gli odds aumentano del 50%"
+- $\exp(\hat\beta_k) = 0.80$ → "gli odds diminuiscono del 20%"
+
+### Comment template — single odds ratio
+
+The 95% confidence interval for the odds ratio of `[variable]` is `[L, U]`. With 95% confidence, the true odds ratio lies in this range. Since the interval [does not include / includes] 1, the effect of `[variable]` on the odds of [success_event] is [statistically significant / not significant] at the 5% level. Specifically, a one-unit increase in `[variable]` multiplies the odds of [success] by a factor between `[L]` and `[U]`, holding other covariates constant — equivalent to a [decrease/increase] of `[(1-L)·100]%` to `[(U-1)·100]%`.
+
+### Comment template — full coefficient discussion
+
+The variable `[name]` has an estimated coefficient $\hat\beta = [value]$ on the logit scale, with z-statistic [value] and p-value [value]. The corresponding odds ratio is $\exp(\hat\beta) = [OR]$ with 95% CI $[L, U]$.
+
+Interpretation: [a one-unit increase in / membership in the reference group of] `[name]` is associated with a multiplicative change in the odds of [success] by a factor of [OR], holding other covariates constant. The CI [does not / does] include 1, confirming [the statistical significance / the lack of significance] of this effect at the 5% level.
+
+### Comment template — binary covariate
+
+The estimated odds ratio for `[group1]` vs `[group0]` is $\exp(\hat\beta) = [value]$. Holding other covariates constant, subjects in `[group1]` have odds of [outcome] that are [value] times those in `[group0]`. The 95% CI is $[L, U]$, [not] including 1, confirming [the presence / the absence] of a significant association.
+
+---
+
+## Step 8 — Predizione delle probabilità
 
 ```{r logit-predict, eval=FALSE}
 # nuova osservazione
@@ -1541,37 +1722,50 @@ table(predicted = predicted_class, observed = df$y)
 
 **Comment template:**
 
-> For a new unit with characteristics `[describe values]`, the estimated probability of `[success_event]` is $\hat{p} = [value]$. Under a 0.5 classification threshold, the unit is predicted as `[class 1 / class 0]`, indicating that the model considers it `[likely / unlikely]` to be a success.
+For a new unit with characteristics `[describe values]`, the estimated probability of `[success_event]` is $\hat{p} = [value]$. Under a 0.5 classification threshold, the unit is predicted as `[class 1 / class 0]`, indicating that the model considers it `[likely / unlikely]` to be a success.
 
-### Full comment template — coefficient discussion
+---
 
-> The variable `[name]` has an estimated coefficient $\hat\beta = [value]$ on the logit scale, with z-statistic [value] and p-value [value]. The corresponding odds ratio is $\exp(\hat\beta) = [OR]$ with 95% CI $[L, U]$.
->
-> Interpretation: [a one-unit increase in / membership in the reference group of] `[name]` is associated with a multiplicative change in the odds of [success] by a factor of [OR], holding other covariates constant. The CI [does not / does] include 1, confirming [the statistical significance / the lack of significance] of this effect at the 5% level.
+## Step 9 (opzionale) — Likelihood Ratio Test per modelli annidati
 
-### Trappole comuni (regressione logistica)
+```{r lrt, eval=FALSE}
+mod_reduced <- glm(y ~ x1, data = df, family = binomial)
+mod_full    <- glm(y ~ x1 + x2 + x3, data = df, family = binomial)
+
+# LRT (chi-quadro): usare "Chisq", NON F-test come in lm()
+anova(mod_reduced, mod_full, test = "Chisq")
+```
+
+La statistica è la **differenza di deviance** $D = 2[\ell(M_1) - \ell(M_0)]$, distribuita come $\chi^2_{p_1 - p_0}$ sotto $H_0$.
+
+**Comment template:**
+
+The likelihood ratio test comparing the reduced model (`[M0 covariates]`) to the full model (`[M1 covariates]`) yields a deviance difference of [value] on [df_diff] degrees of freedom (p-value [value]). We [reject / fail to reject] $H_0$ that the additional covariates have no effect: at the [α]% level, `[var_x]` and `[var_y]` [jointly contribute / do not jointly contribute] to explaining the response, beyond what is already captured by the reduced model.
+
+---
+
+## Trappole comuni (regressione logistica)
 
 - **Wald test, non t-test**: il test su ogni coefficiente in `summary(glm)` è Wald con riferimento $\mathcal{N}(0,1)$. Valore critico al 5%: 1.96 esatto
 - **I coefficienti sulla scala logit non si interpretano**: esponenziare sempre per ottenere odds ratio
-- **IC per OR**: prendere `exp()` dell'IC del coefficiente. Non calcolare SE dell'OR direttamente
+- **CI per OR**: prendere `exp()` dell'CI del coefficiente. Non calcolare SE dell'OR direttamente
 - **Livello di riferimento**: R sceglie il primo livello alfabetico. Usare `relevel()` per controllare
 - **Per confronto modelli annidati usare $\chi^2$, non F**: `anova(M0, M1, test = "Chisq")`
-- **IC che include 1**: se l'IC per un OR include 1, la variabile NON è significativa
+- **CI che include 1**: se l'CI per un OR include 1, la variabile NON è significativa
 - **Predire probabilità**: usare sempre `type = "response"`, altrimenti si ottengono logit
 
-### Confronto rapido: `lm` vs `glm`
+## Confronto rapido: `lm` vs `glm`
 
 | Scenario | `lm` (lineare) | `glm` (logistico) |
 |----------|----------------|-------------------|
 | Test singolo coefficiente | t-test (esatto) | Wald test (asintotico, normale) |
 | Valore critico 5% | $t^*_{n-p-1, 0.975}$ (≈ 1.96 per $n$ grande) | 1.96 esatto |
-| IC singolo coefficiente | $\hat\beta \pm t^* \cdot SE$ | $\hat\beta \pm 1.96 \cdot SE$ |
+| CI singolo coefficiente | $\hat\beta \pm t^* \cdot SE$ | $\hat\beta \pm 1.96 \cdot SE$ |
 | Test globale | F-test (in summary) | Confronto null vs residual deviance |
 | Confronto modelli annidati | `anova(M0, M1)` → F-test | `anova(M0, M1, test = "Chisq")` → LRT |
 | Selezione automatica | `stepAIC(...)` | `stepAIC(...)` (identico) |
 | Predizione | `predict(mod, newdata)` | `predict(mod, newdata, type = "response")` |
 
----
 
 # Clustering Model-Based (Ch. 13)
 

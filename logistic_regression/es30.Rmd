@@ -1,0 +1,192 @@
+---
+title: "Es30"
+output: html_document
+date: "2026-05-10"
+---
+
+## Setup
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 6,
+  fig.height = 4,
+  fig.align = "center"
+)
+```
+
+
+```{r libraries}
+# Caricamento librerie usate nel corso
+library(MASS)       # stepAIC, Boston dataset
+library(car)        # vif, diagnostica
+library(corrplot)   # visualizzazione matrici di correlazione
+library(boot)       # bootstrap
+library(ppcor)      # correlazioni parziali
+library(GGally) 
+library(mvtnorm)
+library(ggplot2)
+library(skimr)
+library(mclust)
+```
+The data in the boot::urine dataset come from a study of 79 individuals. We are interested in the presence of calcium crystals in urine (absent/present) as a function 
+of urine concentration (osmo) and glomerular filtration (cond). Recode categorical variables as factors.
+
+```{r}
+urine = boot::urine
+head(urine)
+```
+
+```{r}
+# remove rows with NA on covariates of interest
+urine_clean <- urine[complete.cases(urine[, c("r", "osmo", "cond")]), ]
+nrow(urine_clean)
+# factorization of the response variable
+urine_clean$r = as.factor(urine_clean$r)
+levels(urine_clean$r)
+```
+
+### 30.1 What are the logits in this study?
+
+The logit in this study is defined as the logarithm of the odds of having calcium 
+oxalate crystals present in urine (r = "1") versus absent (r = "0"):
+
+$$
+\text{logit}(p_i) = \log\left(\frac{p_i}{1 - p_i}\right) 
+= \log\left(\frac{P(r_i = \text{present})}{P(r_i = \text{absent})}\right)
+$$
+
+where $p_i$ denotes the probability of presenting crystals for individual $i$. The 
+logistic regression model assumes the logit to be a linear function of the available 
+covariates — urine osmolarity (`osmo`) and conductivity (`cond`):
+
+$$
+\text{logit}(p_i) = \beta_0 + \beta_1 \cdot \text{osmo}_i + \beta_2 \cdot \text{cond}_i
+$$
+
+While probabilities $p_i$ are bounded in $[0, 1]$ and odds in $[0, +\infty)$, the 
+logit transformation maps them to the entire real line $(-\infty, +\infty)$, making 
+linear modeling with potentially unbounded covariates appropriate. The estimated 
+coefficients $\hat\beta_1, \hat\beta_2$ describe how the log-odds of crystal presence 
+change with a one-unit increase in the corresponding covariate, holding the other constant.
+
+
+### 29.1 Provide descriptive statistics for the binary indicators to assess the association of each covariate with the response variable of interest (calc). Comment on the results and suggest possible reasons for the presence or absence of an association.
+
+Since both covariates in this study (osmo and cond) are continuous, the descriptive analysis focuses on numerical summaries by response level and boxplots — the analogue of contingency tables for categorical covariates.
+
+### 29.2 For the quantitative variables, produce boxplots and summary statistics by cancer diagnosis.
+
+```{r}
+require(gridExtra)
+p1 <- ggplot(urine_clean, aes(x = r, y = osmo)) +
+geom_boxplot(aes(fill = r), col = "black") +
+geom_point(aes(col = r)) +
+xlab("Calcium Crystals") + ylab("Urine concentration") +
+scale_fill_manual(values=c("#ffe5ab", "#cce8f8")) +
+scale_color_manual(values=c("#E69F00", "#56B4E9")) +
+theme_bw()
+p2 <- ggplot(urine_clean, aes(x = r, y = cond)) +
+geom_boxplot(aes(fill = r), col = "black") +
+geom_point(aes(col = r)) +
+xlab("Calcium Crystals") + ylab("glomerular filtration") +
+scale_fill_manual(values=c("#ffe5ab", "#cce8f8")) +
+scale_color_manual(values=c("#E69F00", "#56B4E9")) +
+theme_bw()
+grid.arrange(p1, p2, ncol = 2)
+```
+In the selected sample, the subjects having calcium crystals in urines have on average both an higher urine concentration and then subjects that do not have the crystals detected.
+In particular, looking the the median value, we highlight that half of the subjects that do not have calcium crystals in urines have a value of osmo (urine concentration) that is less then 562, while half of the subjects that present that condition have that value under 721. We also see that no subject that have calcium crystals have a value of osmo under 251, while in the other category different cases are present, with a minimum of 187. 
+Considering the cond variable, we have a different interpretation: we notice that the median of glomerular filtration is exactly the same for those who have calcium crystals and those who don't. However, we can see that the distribution is quite different: looking at the quantiles, we can see that the 1st quantile where r=0 is 12.5, while in the case of r=1 is 17.4, suggesting that in the first case we have an higher quantitative of values in the lower part of the graph(0-15). This behaviour is also confirmed by the descriptive statistics analyzed in the following:
+
+```{r}
+by(urine_clean[, c(2, 4, 5)], urine_clean$r, summary)
+
+```
+
+### 29.3 Fit a logistic regression model with r as the response variable and perform variable selection. Comment on the results obtained according to the Akaike Information Criterion. State a conclusion in context.
+
+We initially consider the complete model, in which all the explanatory variables are used to explain the presence or absence of lung cancer. We perform model selection using the step() function.
+
+```{r}
+mod.C <- glm(r ~ osmo + cond,
+            data   = urine_clean,
+            family = binomial)
+step(mod.C, trace = TRUE)
+```
+The initial (complete) model is associated to a value of the AIC index equal to 99.38. Since this model does not have an high number of covariates (just 2), it does not have an high number of covariates the AIC criterion suggests that this is already the optimized one: we can see that removing one/or both of them would translate in a strong deterioration in the AIC. 
+
+
+### 29.4 Carefully interpret each regression coefficient in the model selected in the previous step.
+```{r}
+mod = glm(formula = r ~ osmo + cond, family = binomial, data = urine_clean)
+summary(mod)
+```
+
+
+```{r}
+IQR(residuals.glm(mod))
+```
+The estimated logistic regression model is:
+
+$$
+\text{logit}(\hat p_i) = -1.222 + 0.0068 \cdot \text{osmo}_i - 0.1552 \cdot \text{cond}_i
+$$
+
+Looking at the estimated coefficients:
+
+- The **intercept** ($\hat\beta_0 = -1.222$) is **not statistically significant** at 
+  the 5% level (z = -1.687, p-value = 0.092). It represents the log-odds of presenting 
+  calcium oxalate crystals for an individual with zero urine osmolarity and zero 
+  conductivity — a combination far outside the observed range of the data. As such, 
+  the intercept does not have a meaningful substantive interpretation in this context.
+
+- The coefficient of **osmo** ($\hat\beta_1 = 0.0068$) is positive and 
+  **statistically significant at the 1% level** (z = 2.941, p-value = 0.003). 
+  This indicates that urine osmolarity is positively associated with the probability 
+  of crystal presence: higher osmolarity is linked to higher odds of presenting 
+  calcium crystals, holding conductivity constant. The corresponding odds ratio 
+  is $\exp(0.0068) \approx 1.007$, meaning that a one-unit increase in `osmo` 
+  multiplies the odds of crystal presence by a factor of $1.007$ — equivalently, 
+  the odds increase by approximately 0.7% per unit. Although this effect appears 
+  small per unit, the natural range of `osmo` in the sample (from ~190 to ~1200) 
+  implies a substantial cumulative effect across the observed values.
+
+- The coefficient of **cond** ($\hat\beta_2 = -0.1552$) is negative and 
+  **statistically significant at the 5% level** (z = -2.358, p-value = 0.018). 
+  The negative sign indicates that conductivity is inversely associated with crystal 
+  presence: higher values of `cond` correspond to lower odds of presenting crystals, 
+  holding osmolarity constant. The odds ratio is $\exp(-0.1552) \approx 0.856$, 
+  meaning that a one-unit increase in `cond` multiplies the odds by $0.856$, or 
+  equivalently reduces them by about 14.4%.
+
+Regarding the **goodness of fit**, the null deviance is $105.17$ on $76$ degrees 
+of freedom, while the residual deviance is $93.38$ on $74$ degrees of freedom — 
+a reduction of $11.79$ on $2$ degrees of freedom. This reduction suggests that 
+the inclusion of `osmo` and `cond` modestly improves the fit compared to the 
+intercept-only model. The AIC of the fitted model is $99.38$.
+
+The Fisher Scoring algorithm converged in $4$ iterations, confirming the absence 
+of numerical issues during maximum likelihood estimation.
+
+Overall, both covariates show a statistically significant association with the 
+presence of calcium oxalate crystals: higher urine osmolarity increases the odds, 
+while higher conductivity decreases them, after mutually adjusting for each other. 
+The next step is to compute confidence intervals for the odds ratios and to 
+evaluate whether model selection (e.g., via stepwise AIC) suggests a more 
+parsimonious specification.
+
+### 29.5 Provide a confidence interval for the odds ratio associated with the estimated coefficient of osmo. Comment on the result.
+
+```{r}
+exp(confint(mod))
+```
+```{r}
+cbind(OR = exp(coef(mod)), exp(confint(mod)))
+```
+The 95% confidence interval for the odds ratio of osmo is [1.003, 1.012]. With 95% confidence, the true odds ratio lies in this range. Since the interval does not include 1, the effect of osmo on the odds of the presence of calcium crystals is statistically significant at the 5% level. Specifically, a one-unit increase in osmo multiplies the odds of r by a factor between 1.003 and 1.012, holding other covariates constant.
+
+### 29.6 Can we conclude that osmo causes an increased odds of developing crystals in urines?
+Statistically, we can say so due to the fact that the CI of the osmo variable does include 1, confirming the statistical significance  of this effect at the 5% level.

@@ -1,0 +1,75 @@
+---
+title: "LogisticRegression"
+author: "me"
+date: "2026-05-08"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##29.1 descriptive statistics
+```{r}
+
+```
+
+```{r}
+table(birds$cancer, birds$female)
+```
+The odds of having cancer of a male
+
+```{r}
+37/74
+```
+The odds of having cancer of a female
+
+```{r}
+12/24
+```
+
+Males and females have the same odds of having cancer (not probability)
+
+The odds of having cancer are the probability of having cancer divided by the probability of not having cancer.
+
+odds ratio = odds in group 1 / odds in group2 
+
+```{r}
+0.5/0.5
+```
+
+##29.3  Fit a logistic regression model with cancer as the response variable and perform variable selection. Comment on the results obtained according to the Akaike Information Criterion. State a conclusion in context
+
+```{r}
+full_model = glm(formula = cancer ~ . , data = birds, family = binomial)
+step(full_model)
+```
+
+```{r}
+mod.sel = glm(formula = cancer~ yrsmoke + bird, data = birds, family = binomial)
+coef(mod.sel)
+```
+keeping fixed the other variables, having a increase on yrsmoke gives a multiplication on the odds of having cancer of the coefficient (~6% for each year)
+
+```{r}
+
+```
+
+Provide a confidence interval for the odds ratio associated with the estimated
+coefficient of bird. Comment on the resul
+```{r}
+exp(coef(mod.sel))
+```
+```{r}
+exp(cbind(
+  OR = coef(mod.sel),
+  confint(mod.sel)
+))
+```
+The estimated odds ratio associated with bird1 is 4.37, with a 95% confidence interval equal to (2.05, 9.75).
+This means that the odds of having cancer for individuals with bird = 1 are estimated to be about 4.4 times the odds for the reference group (bird = 0), holding yrsmoke constant.
+
+Since the confidence interval does not include 1, the effect of bird is statistically significant at the 5% level.
+
+
+
