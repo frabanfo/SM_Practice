@@ -820,6 +820,8 @@ Specifically, we aim to:
 Based on [theory / domain knowledge], we expect [HYPOTHESES ABOUT SIGNS].
 The analysis will [verify these hypotheses / explore the relationships].
 
+The available data come from an observational study, not from a randomized experiment. Therefore, the estimated effect of [explanatory variable] on [response variable] should be interpreted as an association rather than a causal relationship. In particular, unmeasured confounding factors or external influences may partially explain the observed relationship. (observed and not recorded with any kind of experiment)
+
 ### Fitting the model
 
 ```{r lm-fit, eval=FALSE}
@@ -896,11 +898,13 @@ interpretation].
 
 The model explains $[R²×100]\%$ of the variance in $[response]$ 
 ($R^2 = [R²]$, adjusted $R^2 = [R²-adj]$). The residual standard error is 
-$[S]$, suggesting [interpretation of typical deviation].
+$[S]$, it means that, on average, the observed
+and the estimated values for each sample unit differ by [],  Although the value seems small, it needs to be further evaluated with respect to a centrality index (e.g., the mean) of the response variable. Computing the ratio between the RSE and the mean of the carats, we
+obtain the percentage error, equal to [RSE/MEAN] = []: on average the percentage errorbetween observed and fitted values is equal to %.
 
 The global F-test yields $F = [F]$ on $[p]$ and $[n-p-1]$ degrees of freedom 
 (p-value $[value]$). We reject $H_0$: at least one covariate is associated 
-with $[response]$.
+with $[response]$ at this confidence level.
 
 ### Preliminary residual analysis
 
@@ -1323,26 +1327,201 @@ plot(df$x1, df$y,
      xlab = "x1", ylab = "y")
 
 # add fitted lines for each group
-for (g in levels(df$group)) {
-  subset_g <- df[df$group == g, ]
-  abline(lm(y ~ x1, data = subset_g),
-         col = which(levels(df$group) == g))
-}
-legend("topleft", legend = levels(df$group),
-       col = 1:nlevels(df$group), lty = 1, cex = 0.8)
+abline(intercept, beta2, col = "brown")
+abline(intercept + beta1, beta2, col = "blue")
 ```
 
-### Comment templates
 
-For categorical covariate:
+```{r}
+# scatterplot with non-parallel fitted lines (different slopes per group)
+library(ggplot2)
 
-> The variable `[category]` has a significant effect on the response. Compared to the reference category `[ref]`, units in category `[B]` have a `[higher / lower]` average response by `[value]` units, holding other covariates constant. The effect is statistically significant (p-value `[value]`).
+ggplot(df, aes(x = VAR_CONTINUA, y = RESPONSE, color = VAR_GRUPPO)) +
+  geom_point(size = 2, alpha = 0.8) +
+  geom_smooth(method = "lm", se = FALSE, linewidth = 1.2) +
+  scale_color_manual(values = c("salmon", "steelblue")) +
+  labs(title = "Interaction model: RESPONSE vs VAR_CONTINUA",
+       x = "VAR_CONTINUA label",
+       y = "RESPONSE label",
+       color = "VAR_GRUPPO label") +
+  theme_bw()
+```
 
-For parallel-lines vs interaction:
+## Comment templates — Categorical covariates and interactions
 
-> A nested F-test compares the parallel-lines model with the interaction model. The F-statistic is `[value]` (p-value `[value]`), so we `[reject / fail to reject]` $H_0$ that the slopes are equal across groups. The `[interaction / parallel-lines]` model is preferred. The estimated slope of `[x1]` is `[value1]` for the reference group `[A]` and `[value1 + γ]` for group `[B]` — meaning that the effect of `[x1]` on $Y$ is `[stronger / weaker]` for group `[B]`.
+### Template 1 — Categorical covariate (with one or more levels)
+
+**Block 1 — Introduction and significance statement**
+
+The variable `[category]` is included in the model as a categorical predictor 
+with `[J]` levels: `[list levels]`. R automatically encodes it through `[J-1]` 
+dummy variables, taking `[ref]` as the reference category. The estimated 
+coefficients of the dummies represent the **average difference in the response** 
+between each non-reference level and `[ref]`, holding all other covariates 
+constant.
+
+**Block 2 — Coefficient-by-coefficient interpretation**
+
+The coefficient associated with category `[B]` is $\hat\beta_{[B]} = [value]$, 
+with standard error $[SE]$ and `[t / z]`-statistic $[value]$ (p-value $[value]$). 
+This indicates that, compared to the reference category `[ref]`, units in `[B]` 
+have on average a `[higher / lower]` value of the response by approximately 
+$[|value|]$ units, holding the other covariates constant. The effect is 
+**[statistically significant / not statistically significant]** at the 
+$[α]$% level.
+
+[Repeat the paragraph above for each non-reference level.]
+
+**Block 3 — Substantive interpretation**
+
+In substantive terms, this means that `[contextual interpretation: e.g., 
+"insulated houses consume on average 1.57 cubic feet less gas per week than 
+non-insulated ones, at any given temperature"]`. This result is `[consistent 
+with / contrary to]` our initial hypothesis that `[recall hypothesis from 
+research question]`.
+
+**Block 4 — Robustness note (optional but appreciated)**
+
+Note that changing the reference category would alter the numerical values of 
+the dummy coefficients but would **not** affect: the fitted values $\hat{y}_i$, 
+the residual standard error, the $R^2$, the global F-test, or any predictions. 
+This is a general property of dummy coding: the model is invariant to the 
+choice of reference; only the parameterization changes.
+
+
+### Template 2 — Parallel-lines vs interaction model
+
+**Block 1 — Setup of the comparison**
+
+To assess whether the effect of `[continuous_covariate]` on the response 
+differs across the levels of `[categorical_covariate]`, two competing 
+specifications are considered:
+
+- **Parallel-lines model** (no interaction): assumes that the slope of 
+  `[continuous_covariate]` is identical across groups defined by 
+  `[categorical_covariate]`. The groups differ only in their intercept 
+  (a constant additive shift).
+  
+$$
+Y_i = \beta_0 + \beta_1 \cdot \text{[x1]}_i + \delta \cdot D_i + \epsilon_i
+$$
+
+- **Interaction model**: allows the slope of `[continuous_covariate]` to 
+  vary across groups, in addition to a possible difference in intercept.
+
+$$
+Y_i = \beta_0 + \beta_1 \cdot \text{[x1]}_i + \delta \cdot D_i + \gamma \cdot (\text{[x1]}_i \cdot D_i) + \epsilon_i
+$$
+
+The two models are nested: the parallel-lines model corresponds to imposing 
+$\gamma = 0$ in the interaction model.
+
+**Block 2 — Formal test**
+
+A **nested F-test** compares the two specifications:
+
+```{r f-test1, eval=FALSE}
+anova(mod_parallel, mod_interaction)
+```
+
+The test statistic is $F = [value]$ on $(1, [n-p-1])$ degrees of freedom, 
+with p-value $[value]$. We **[reject / fail to reject]** the null hypothesis 
+$H_0: \gamma = 0$ (i.e., that the slopes are equal across groups) at the 
+$[α]$% level. The same conclusion can be drawn by inspecting the t-test on 
+the interaction coefficient $\hat\gamma$ in the summary of the interaction 
+model, which yields t = $[value]$ and p-value $[value]$.
+
+**Block 3 — Choice of model**
+
+Based on this result, the **[parallel-lines / interaction]** model is 
+preferred:
+
+- If parallel-lines is preferred: the data do not provide enough evidence 
+  that the slopes differ across groups, so the more parsimonious parallel-lines 
+  specification is retained. This is consistent with the principle of 
+  preferring simpler models when the additional complexity does not yield 
+  significant improvements in fit.
+- If interaction is preferred: the slopes are significantly different across 
+  groups, and forcing them to be equal would misspecify the model.
+
+**Block 4 — Interpretation of slopes (use this only if interaction is preferred)**
+
+Under the selected interaction model:
+
+- The estimated slope of `[continuous_covariate]` for the reference group 
+  `[A]` is $\hat\beta_1 = [value1]$.
+- The estimated slope for group `[B]` is $\hat\beta_1 + \hat\gamma = 
+  [value1 + value_gamma] = [combined_value]$.
+- The difference $\hat\gamma = [value_gamma]$ measures **how much the slope 
+  changes** when moving from group `[A]` to group `[B]`. In substantive terms, 
+  this means that the effect of `[continuous_covariate]` on the response is 
+  **[stronger / weaker]** in group `[B]` than in group `[A]`.
+
+**Block 5 — Interpretation of intercepts (always include)**
+
+The intercept differs between the two groups by the amount $\hat\delta = 
+[value]$: at the reference value of `[continuous_covariate]` (typically zero 
+or its sample mean if centered), units in group `[B]` have an average 
+response that is `[higher / lower]` than units in group `[A]` by $[|value|]$ 
+units.
+
+**Block 6 — Summary and transition**
+
+Overall, `[brief summary: e.g., "the two groups differ both in baseline level 
+and (if interaction) in their sensitivity to the continuous covariate"]`. 
+This finding has practical implications for `[contextual application]`. The 
+next analytical step is to `[fit diagnostics / predict for new units / 
+compute confidence intervals for the slopes]`.
+
+ù
+### Quick reference table
+
+| Scenario | Test result | Preferred model | Substantive interpretation |
+|----------|-------------|------------------|----------------------------|
+| F-test p > 0.05 | Fail to reject $H_0: \gamma = 0$ | Parallel-lines | Effect of $x_1$ is the same across groups; groups differ only in baseline |
+| F-test p < 0.05 | Reject $H_0: \gamma = 0$ | Interaction | Effect of $x_1$ depends on the group; modify wording of interpretation |
+| F-test p ≈ 0.05 | Borderline | Either, prefer simpler unless theory supports interaction | Report both and let theory guide |
+
+### Practical tip
+
+In R, the nested F-test for parallel-lines vs interaction is performed automatically when you write:
+
+```{r nested-f1, eval=FALSE}
+mod_parallel    <- lm(y ~ x1 + group, data = df)
+mod_interaction <- lm(y ~ x1 * group, data = df)    # x1 * group = x1 + group + x1:group
+
+anova(mod_parallel, mod_interaction)
+```
+
+The output will show the F-statistic, df, and p-value of the test.
 
 ---
+
+### Concrete fill-in for the whiteside (Es. 23) example
+
+Adapt the template to your specific exercise as follows:
+
+The variable `Insul` enters the model as a categorical predictor with two 
+levels — `Before` (reference) and `After`. R encodes it as a single dummy 
+$D_i$ equal to $1$ for after-insulation observations and $0$ for before. 
+The estimated coefficient $\hat\beta_{InsulAfter} = -1.57$ (with SE $= 
+0.20$, t = $-7.83$, p-value $< 0.001$) indicates that, holding the external 
+temperature constant, after-insulation observations show on average a gas 
+consumption $1.57$ cubic feet **lower** than before-insulation observations. 
+The effect is highly statistically significant.
+
+In substantive terms, this means that the insulation intervention is 
+associated with a reduction of approximately $1.57$ cubic feet of weekly 
+gas consumption, at any given outdoor temperature. The result is consistent 
+with our initial hypothesis that thermal insulation reduces heating demand.
+
+[If you were to test for interaction:]
+
+A nested F-test was conducted to assess whether the slope of `Temp` differs 
+between the two insulation periods. The F-statistic is $[value]$ on $(1, 51)$ 
+degrees of freedom (p-value $[value]$): we [reject / fail to reject] the 
+hypothesis of equal slopes. The [parallel-lines / interaction] specification 
+is therefore preferred. [Continue with the appropriate interpretation block.]
 
 ## Common pitfalls (regression)
 
