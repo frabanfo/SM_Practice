@@ -808,6 +808,18 @@ $$Y_i = \beta_0 + \beta_1 x_{i1} + \beta_2 x_{i2} + \dots + \beta_p x_{ip} + \ep
 4. **Independence**: $\text{Cov}(\epsilon_i, \epsilon_j) = 0$ for $i \neq j$
 5. **Normality** (needed for t-test, F-test, CI): $\epsilon_i \sim \mathcal{N}(0, \sigma^2)$
 
+### Research question
+The main objective is to model how [RESPONSE] depends on [COVARIATES],
+in the context of [APPLIED CONTEXT].
+
+Specifically, we aim to:
+1. Quantify the effect of [COVARIATES] on [RESPONSE]
+2. Identify which covariates are significant predictors
+3. [Optional: predict / make decisions / classify / ...]
+
+Based on [theory / domain knowledge], we expect [HYPOTHESES ABOUT SIGNS].
+The analysis will [verify these hypotheses / explore the relationships].
+
 ### Fitting the model
 
 ```{r lm-fit, eval=FALSE}
@@ -858,11 +870,57 @@ summary(mod)$r.squared       # R^2
 summary(mod)$adj.r.squared   # adjusted R^2
 ```
 
-### Comment template
+### Estimated model
 
-> The estimated model is $\hat{Y} = \hat{\beta}_0 + \hat{\beta}_1 x_1 + \dots$. The coefficient of `[variable]` is `[value]`, statistically significant at the `[α]` level (p-value = `[value]`). It can be interpreted as: a unit increase in `[variable]` is associated with an average change of `[value]` units in $Y$, **holding all other covariates constant**.
->
-> The model explains `[R²]` of the variance in the response. The F-statistic is `[value]` with p-value `[value]`, indicating that at least one covariate is significantly associated with $Y$.
+The estimated model is:
+
+$\hat{Y} = [β₀] + [β₁] \cdot \text{[var1]} + [β₂] \cdot \text{[var2]} + \dots$
+
+The intercept ($[β₀]$) [does/does not] have a meaningful interpretation, since 
+[explain]. As expected from our research question, the slope coefficients are 
+[brief description], consistent with the hypothesis that [substantive 
+interpretation].
+
+### Coefficient interpretation
+
+- **[var1]** ($\hat{\beta}_1 = [value]$): [significant/not significant] at the 
+  [α]% level (p-value $[p]$). A unit increase is associated with an average 
+  [change] of $[β_k]$ units in $[response]$, ceteris paribus.
+
+- **[var2]** ($\hat{\beta}_2 = [value]$): [...]
+
+- **[var3]** ($\hat{\beta}_3 = [value]$): [if non-significant: discussion of 
+  why this might be — multicollinearity, sample size, etc.]
+
+### Goodness of fit and global test
+
+The model explains $[R²×100]\%$ of the variance in $[response]$ 
+($R^2 = [R²]$, adjusted $R^2 = [R²-adj]$). The residual standard error is 
+$[S]$, suggesting [interpretation of typical deviation].
+
+The global F-test yields $F = [F]$ on $[p]$ and $[n-p-1]$ degrees of freedom 
+(p-value $[value]$). We reject $H_0$: at least one covariate is associated 
+with $[response]$.
+
+### Preliminary residual analysis
+
+The residuals range from $[Min]$ to $[Max]$ with median $[Median]$. The IQR is 
+$[Q1, Q3]$. [Comment on symmetry / asymmetry, with reference to ratio range/IQR 
+and connection to expected diagnostic plot patterns.] A formal assessment of 
+the model assumptions will be performed in the diagnostic plots section.
+
+### Looking at the results in light of our initial research question:
+
+- We hypothesized that [hypothesis 1, e.g., "all covariates would be positively 
+  associated with Y"]: this is [confirmed / partially confirmed / not 
+  confirmed]. Specifically, [variable A] and [variable B] show the expected 
+  positive association, while [variable C] [does not / shows the opposite].
+
+- The most influential covariates appear to be [list], based on the magnitude 
+  and significance of their coefficients.
+
+- A non-trivial finding is that [unexpected result], which suggests [possible 
+  interpretation or follow-up investigation].
 
 ---
 
