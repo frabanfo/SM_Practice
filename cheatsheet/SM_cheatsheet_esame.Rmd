@@ -61,22 +61,261 @@ load("path/to/file.RData")
 df <- read.table("path/to/file.txt", header = TRUE, sep = "\t")
 ```
 
-# Prima ispezione
-str(df)
-summary(df)
-head(df)
-dim(df)
+## Template — Descriptive statistics for initial data inspection
 
-#summary più completo
-skimr::skim_without_charts(df)
+> Reusable for any exercise that asks to "describe the data" or "report descriptive 
+> statistics" as a preliminary inspection (e.g., Es. 5, 10, 11, 12, 13 of the HW).
 
+### Code patterns by data structure
+
+#### Case 1 — Single continuous variable (e.g., Es. 11 sprint times)
+
+```{r desc-single-vec, eval=FALSE}
+x <- c(...)            # or x <- df$variable_name
+
+# main descriptive statistics
+summary(x)             # min, Q1, median, mean, Q3, max
+sd(x)                  # standard deviation
+IQR(x)                 # interquartile range
+range(x)               # min and max
+length(x)              # sample size
 ```
-### Cosa controllare
 
-- **n_missing**: ci sono NA? Se sì, decidere se rimuoverli (`na.omit(df)`) o gestirli
-- **Tipi delle variabili**: numeric, factor, integer? Una variabile categorica letta come numerica va convertita con `as.factor()`
-- **Range di variazione**: scale molto diverse possono suggerire la necessità di standardizzare
-- **Mediana vs media**: se molto diverse → distribuzione asimmetrica
+For a more compact and structured display, use `skimr`:
+
+```{r desc-skimr, eval=FALSE}
+require(skimr)
+skim_without_charts(data.frame(x = x))
+```
+
+#### Case 2 — Two continuous variables (e.g., Es. 12 two servers)
+
+```{r desc-two-vec, eval=FALSE}
+A <- c(...)
+B <- c(...)
+
+# parallel summaries
+summary(A)
+summary(B)
+
+# parallel SDs
+round(sd(A), 3)
+round(sd(B), 3)
+
+# range comparison
+diff(range(A))         # spread of A
+diff(range(B))         # spread of B
+```
+
+#### Case 3 — Multivariate dataset (e.g., Es. 5 school dataset)
+
+```{r desc-multivar, eval=FALSE}
+require(skimr)
+require(dplyr)
+
+skim_without_charts(df) %>%
+  dplyr::select(-complete_rate)
+
+# coefficient of variation (to compare variability across different scales)
+cv <- function(x) sd(x) / mean(x)
+round(apply(df, 2, cv), 2)
+```
+
+#### Case 4 — Continuous variable by group (e.g., bivariate / regression context)
+
+```{r desc-by-group, eval=FALSE}
+# summary statistics by group
+by(df[, c("var1", "var2")], df$group, summary)
+
+# or with tapply for a single variable
+tapply(df$var1, df$group, summary)
+```
+
+---
+
+### What to comment — checklist by block
+
+#### Block A — Central tendency
+
+- **Mean vs Median**: are they close or far apart? If similar, distribution is 
+  approximately symmetric. If mean > median, positive (right) asymmetry. 
+  If mean < median, negative (left) asymmetry.
+- The **median** is a more robust measure of the "typical value" than the mean 
+  in presence of outliers.
+
+> *Example phrasing*:
+> 
+> "The mean and median of `[variable]` are very similar to each other ([m] vs 
+> [median]), suggesting that the distribution is approximately symmetric around 
+> the central value of [value]. Half of the observations fall below [median] 
+> [interpretation in context]."
+
+#### Block B — Spread / variability
+
+- **Standard deviation**: typical deviation from the mean. Same units as the 
+  variable.
+- **Interquartile range (IQR)**: spread of the central 50% of the data, 
+  robust to outliers.
+- **Range** (max - min): total spread. Compare with IQR: if much larger 
+  (~ 4-6× IQR), there are extreme values in the tails.
+- **Coefficient of variation** ($\sigma/\mu$): dimensionless measure of 
+  variability, useful to compare across variables with different scales.
+
+> *Example phrasing*:
+> 
+> "The standard deviation of `[variable]` is [SD], indicating that observations 
+> deviate on average by approximately [SD] units from the mean. The interquartile 
+> range is [IQR], meaning the central 50% of the data are concentrated in a 
+> range of [IQR] units. The total range is [range], roughly [range/IQR] times 
+> the IQR, [consistent with / suggesting deviation from] a normal-like distribution."
+
+> *When comparing two groups*:
+> 
+> "The variability of `[variable_A]` is [higher / lower / similar to] that of 
+> `[variable_B]` (SD = [SD_A] vs [SD_B]). This suggests that [interpretation in 
+> context: e.g., one group is more consistent than the other]."
+
+#### Block C — Quartiles and distribution shape
+
+- **Q1, Q2 (median), Q3**: divide the data into four equal parts.
+- Compare $|Q1 - \text{median}|$ vs $|\text{median} - Q3|$:
+  - If similar → symmetric distribution
+  - If $|\text{median} - Q3| > |Q1 - \text{median}|$ → right skew
+  - If $|Q1 - \text{median}| > |\text{median} - Q3|$ → left skew
+
+> *Example phrasing*:
+> 
+> "The first quartile is [Q1], the third quartile is [Q3]. One-quarter of the 
+> observations are below [Q1], another quarter are above [Q3]. The position of 
+> the median ([median]) within the IQR suggests [symmetric / right-skewed / 
+> left-skewed] distribution."
+
+#### Block D — Extreme values
+
+- **Min and Max**: total range of observed values.
+- Compare with the application context: are these values **realistic**? Out-of-scale 
+  values may indicate measurement errors or outliers.
+- Compute the rule-of-thumb interval $[\bar x - 3s, \bar x + 3s]$ for a normal 
+  distribution. Observations outside this interval are unusually extreme.
+
+> *Example phrasing*:
+> 
+> "The minimum and maximum observed values are [min] and [max] respectively, 
+> spanning a range of [range] units. The maximum value [appears / does not appear] 
+> realistic given the application context [explain]. Applying the rule of thumb 
+> for normal distributions ($\mu \pm 3\sigma$ = [interval]), [N] observations 
+> fall outside this interval — [a number consistent with normality / 
+> suggesting heavy tails or outliers]."
+
+---
+
+### Generic comment template (combine all blocks)
+
+The descriptive statistics for `[variable_name]` are as follows. The mean is 
+[mean] and the median is [median]: their [similarity / difference] suggests 
+that the distribution is [approximately symmetric / asymmetric] around the 
+central value.
+
+Regarding variability, the standard deviation is [SD], indicating that the 
+observations deviate on average by approximately [SD] units from the mean. 
+The interquartile range is [IQR], with one-quarter of the observations below 
+[Q1] and another quarter above [Q3]. The total range is from [min] to [max], 
+approximately [range/IQR] times the IQR, [consistent with / suggesting deviation 
+from] a normal-like distribution.
+
+[Optional, in applied contexts]: In substantive terms, these values indicate 
+that [interpretation in context — e.g., "the athlete's typical sprint time is 
+around 36 seconds, with relatively consistent performance (low IQR), and one 
+extreme observation that warrants further investigation"].
+
+[Optional, when comparing groups]: Comparing the two groups, `[group_A]` shows 
+[higher / lower / similar] central tendency and [higher / lower / similar] 
+variability than `[group_B]`. Specifically, the mean of [variable] is [mean_A] 
+in group A versus [mean_B] in group B, and the standard deviation is [SD_A] vs 
+[SD_B].
+
+---
+
+### Quick rule of thumb
+
+| Pattern observed | Interpretation |
+|------------------|----------------|
+| mean ≈ median | Approximately symmetric distribution |
+| mean > median | Positive asymmetry (right tail) |
+| mean < median | Negative asymmetry (left tail) |
+| range ≈ 4-6 × IQR | Consistent with normal distribution |
+| range >> 6 × IQR | Heavy tails or outliers present |
+| Few observations outside $[\bar x \pm 3s]$ | Consistent with normality |
+| Many observations outside $[\bar x \pm 3s]$ | Deviation from normality |
+| SD large relative to mean (CV > 1) | High relative variability |
+| SD small relative to mean (CV < 0.1) | Highly concentrated data |
+
+---
+
+### Tip — connecting EDA to the next step
+
+Always close the descriptive analysis with a **transition sentence** that 
+links to the upcoming analysis. Example endings:
+
+- For regression contexts:
+  > "These preliminary observations suggest that [variable] is approximately 
+  > normally distributed, supporting the assumption of normality that will be 
+  > required in the subsequent regression model. Possible outliers identified 
+  > at the descriptive level will be assessed via Cook's distance in the 
+  > diagnostic phase."
+
+- For bootstrap contexts:
+  > "Given the small sample size and the presence of potential outliers, 
+  > the bootstrap procedure is appropriate to evaluate the accuracy of the 
+  > estimator without relying on distributional assumptions."
+
+- For bivariate/multivariate contexts:
+  > "The univariate descriptives indicate that both variables [appear / do not 
+  > appear] consistent with a normal distribution. The bivariate analysis 
+  > performed in the next section will further assess the joint distribution 
+  > and the association between the two variables."
+
+---
+
+### Practical examples (concrete fill-in)
+
+#### Example 1 — Single variable (Es. 11 sprint times)
+
+After running `summary(times)` and `sd(times)`, you might write:
+
+The descriptive statistics for the 200m sprint times show a median of [36.31] 
+seconds and a mean of [36.94] seconds. The slight difference between mean and 
+median (with mean higher) suggests a positive asymmetry in the distribution.
+
+The interquartile range is [1.63] seconds (Q1 = [35.50], Q3 = [37.13]), 
+indicating that the central 50% of times are concentrated in a narrow window, 
+consistent with the athlete's relative performance consistency.
+
+However, the maximum observed value ([84.07] seconds) is noticeably distant 
+from Q3 (approximately [38] times the IQR), suggesting the presence of an 
+outlier — possibly due to a measurement error or a non-typical event during 
+that specific trial. The minimum value ([22.48] seconds) appears realistic 
+as a personal best.
+
+#### Example 2 — Two groups (Es. 12 servers)
+
+After running `summary(A)` and `summary(B)`, you might write:
+
+The descriptive statistics show that server B is consistently faster than 
+server A for the eight processed files. The mean processing time is [158.9] 
+ms for server A versus [146.9] ms for server B — a difference of approximately 
+[12] ms on average. Similarly, the median is [159.5] ms for A and [144.5] ms 
+for B, confirming the systematic advantage of server B.
+
+In terms of variability, the standard deviation is [17.2] ms for server A and 
+[15.6] ms for server B: server A shows slightly more variable performance, 
+although the difference is modest. The range of values is comparable between 
+the two servers ([55] ms for A vs [48] ms for B).
+
+Overall, the descriptive analysis suggests that server B not only performs 
+faster on average, but also with marginally higher consistency. Whether this 
+difference is statistically significant given the small sample size (n = 8) 
+will be assessed via the bootstrap procedure in the next section.
 
 ### Conversione di tipo (frequente)
 
@@ -686,43 +925,54 @@ theta_boot <- result_boot$thetastar
 **Per statistiche su 2 campioni** (es. differenza medie A e B):
 
 ```{r boot-two-samples, eval=FALSE}
+require(bootstrap)
+set.seed(130)
+n <- length(serverA)
 aux_fun <- function(ind) {
-  A.boot <- A[ind]
-  B.boot <- B[ind]
-  mean(A.boot) - mean(B.boot)
+A.boot <- serverA[ind]
+B.boot <- serverB[ind]
+mean(A.boot) - mean(B.boot)
 }
-diff.boot <- bootstrap::bootstrap(x = 1:n,
+mean.boot <- bootstrap::bootstrap(x = 1:n,
                                   nboot = 1000,
                                   theta = aux_fun)
+theta_boot <- mean.boot$thetastar  
+summary(theta_boot)
+```
 ```
 
 ### Standard error e bias
 
 ```{r boot-se-bias, eval=FALSE}
-# stima puntuale originale
+# original point estimate
 theta_orig <- mean(x)
+round(theta_orig, 3)
 
-# standard error = SD delle B stime bootstrap
+# standard error = SD of the B bootstrap estimates
 se_boot <- sd(theta_boot)
+round(se_boot, 3)
 
-# bias = differenza tra media bootstrap e stima originale
+# bias = bootstrap mean - original estimate
 bias_boot <- mean(theta_boot) - theta_orig
+round(bias_boot, 3)
 
-# rapporto SE / stima (utile per il commento)
-round(100 * se_boot / theta_orig, 2)         # in %
+# SE-to-estimate ratio (useful for commenting)
+round(100 * se_boot / theta_orig, 2)  
 ```
 
 ### Intervallo di confidenza con il metodo percentile
 
 ```{r boot-ci, eval=FALSE}
-# CI 95%
-quantile(theta_boot, probs = c(0.025, 0.975))
+ci_95 <- quantile(theta_boot, probs = c(0.025, 0.975))
+round(ci_95, 3)
 
-# CI 90%
-quantile(theta_boot, probs = c(0.05, 0.95))
+# percentile CI 90%
+ci_90 <- quantile(theta_boot, probs = c(0.05, 0.95))
+round(ci_90, 3)
 
-# CI 99%
-quantile(theta_boot, probs = c(0.005, 0.995))
+# percentile CI 99%
+ci_99 <- quantile(theta_boot, probs = c(0.005, 0.995))
+round(ci_99, 3)
 ```
 
 ### Plot della distribuzione bootstrap
@@ -765,20 +1015,291 @@ Il **CI percentile** è preferito al **CI simmetrico** $\hat\theta \pm 1.96 \cdo
 
 Per la **media** in campioni grandi, i due CI tendono a coincidere (TLC garantisce normalità asintotica).
 
-### Comment template (exam)
+### Template 1 — Bootstrap of a single statistic (e.g., mean, median, SD, correlation)
 
-**For the bootstrap estimate**:
+**Block A — Setup and motivation**
 
-> I applied the non-parametric bootstrap with $B = 1000$ replications to estimate the accuracy of [statistic]. The bootstrap distribution concentrates around the original point estimate ([value]), and the mean of the replications practically coincides with it, as expected. The estimated standard error is [value], equal to [X]% of the original estimate: this is a [precise / imprecise] estimate.
+The accuracy of the estimator $\hat\theta = $ `[describe statistic]` is assessed 
+via the nonparametric bootstrap with $B = [B]$ replications. This procedure 
+allows estimation of the standard error and the construction of confidence 
+intervals without relying on distributional assumptions, which is particularly 
+useful given `[reason: small sample size / unknown distribution / non-standard 
+estimator]`.
 
-**For the plot**:
+**Block B — Descriptive of the bootstrap distribution**
 
-> The histogram of the bootstrap distribution shows a [symmetric and approximately normal / asymmetric with right/left tail / bimodal] shape. The vertical lines correspond to the original estimate and the mean of the bootstrap replications: their [coincidence / proximity] confirms that the estimator is [unbiased / slightly biased] with respect to the sample. The width of the distribution provides a visual representation of the standard error.
+The $B = [B]$ bootstrap estimates of $\hat\theta$ range from `[min]` to `[max]`, 
+with mean `[mean_boot]` and median `[median_boot]`. Both the mean and median 
+of the bootstrap distribution are very close to the original sample estimate 
+$\hat\theta = [theta_orig]$, in agreement with the general property that the 
+bootstrap distribution is centered (in expectation) on the original sample 
+estimate.
 
-**For the percentile CI**:
+**Block C — Standard error**
 
-> The [level]% confidence interval for [parameter], computed using the percentile method, is [(lower, upper)]. We can state with [X]% confidence that the true parameter value lies in this interval. The width of the interval ([upper-lower]) reflects the estimation uncertainty.
+The bootstrap standard error is computed as the standard deviation of the $B$ 
+bootstrap estimates: $\widehat{SE}_{\text{boot}} = [SE]$. This represents 
+approximately `[SE / |theta_orig| · 100]%` of the magnitude of the original 
+estimate, suggesting a `[high / moderate / low]` level of precision. 
 
+minore 15 - alta
+15-30 moderata
+maggiore 30 alta
+
+[If the sample contains potential outliers, add:] The variability of the 
+bootstrap distribution is also influenced by the presence of `[outlier / 
+unusual observation identified in Block X]`, which is included in different 
+proportions in the various resamples and amplifies the spread of $\hat\theta^*$.
+
+**Block D — Conclusion**
+
+In summary, the bootstrap procedure provides a point estimate of $\hat\theta = 
+[theta_orig]$ with standard error of approximately $[SE]$. Confidence intervals 
+will be constructed in the next step via the percentile method.
+
+---
+
+### Template 2 — Difference between two means
+
+**Block A — Setup**
+
+To compare `[group_A]` and `[group_B]` in terms of their mean values of 
+`[variable]`, the bootstrap is applied to the **difference of sample means** 
+$\hat\theta = \bar X_A - \bar X_B$. The sample estimate of this difference 
+is $[diff_orig]$ `[units]`, indicating that on average `[group_A]` shows 
+`[higher / lower]` values than `[group_B]` by approximately `[|diff_orig|]` 
+units.
+
+**Block B — Bootstrap distribution**
+
+With $B = [B]$ bootstrap replications, the differences range from `[min]` to 
+`[max]`, with mean `[mean_diff_boot]` (essentially coincident with the 
+original difference). The distribution is approximately `[symmetric / 
+right-skewed / left-skewed]` around its central value, suggesting that the 
+sampling distribution of the difference is `[normal-like / non-normal]`.
+
+**Block C — Standard error and precision**
+
+The bootstrap standard error is $\widehat{SE}_{\text{boot}} = [SE]$ `[units]`. 
+This value is `[small / moderate / large]` compared to the magnitude of the 
+estimated difference ($\hat\theta / SE = [ratio]$), suggesting that the 
+observed difference is `[likely / unlikely]` to be statistically meaningful. 
+[A formal confidence interval is constructed in the next step.]
+
+**Block D — Substantive interpretation**
+
+The bootstrap analysis confirms a systematic difference between `[group_A]` 
+and `[group_B]` on average, with `[group_A / group_B]` performing better/worse 
+by approximately `[|diff|]` units. The small sample size (n = `[n]`) limits 
+the precision of this estimate, but the result is consistent with the 
+preliminary observations from the descriptive analysis.
+
+---
+
+### Template 3 — Difference between two medians (or other robust statistics)
+
+**Block A — Motivation**
+
+Given the small sample size and the possibility of skewed distributions, the 
+bootstrap is also applied to the **difference of medians** as an alternative, 
+more robust estimator. The sample estimate is $\hat\theta_{med} = [diff_med_orig]$ 
+`[units]`.
+
+**Block B — Bootstrap distribution (key difference from means)**
+
+With $B = [B]$ bootstrap replications, the differences of medians range from 
+`[min]` to `[max]`. Unlike the bootstrap distribution of the mean — which is 
+typically smooth and continuous — the distribution of the median difference 
+takes only a **small number of distinct values**. For example, [observed 
+pattern: many replicates give the same value, gaps in the distribution]. 
+
+This discreteness is a known feature of the bootstrap when applied to 
+**non-smooth statistics** (such as medians and quantiles) on small samples: 
+the bootstrap resampling can only reproduce values already present in the 
+original sample, leading to a limited set of possible outcomes for 
+quantile-based statistics.
+
+**Block C — Standard error**
+
+The bootstrap standard error of the median difference is `[SE_med]`. This is 
+`[higher / lower / similar to]` the SE of the mean difference ($[SE_mean]$), 
+which is consistent with the general fact that the median tends to be `[more / 
+less]` variable than the mean when `[distribution / sample size]` is 
+`[skewed / small / large]`.
+
+**Block D — Implication for confidence intervals**
+
+Due to the discreteness of the bootstrap distribution of the median, the 
+percentile confidence interval may be less reliable than for the mean: 
+specific quantiles may not correspond to natural cut-off points in the data. 
+This will be reflected in the next step, where the percentile interval is 
+constructed.
+
+---
+
+### Template 4 — Percentile confidence interval
+
+**Block A — Construction**
+
+The percentile-based confidence interval at the $[1-\alpha]$% confidence level 
+is constructed by taking the $\alpha/2$ and $1-\alpha/2$ quantiles of the 
+bootstrap distribution:
+
+$$
+CI_{[1-\alpha]} = \left[\hat\theta^*_{\alpha/2},\; \hat\theta^*_{1-\alpha/2}\right]
+= [L, U]
+$$
+
+In our case, the $[1-\alpha]$% confidence interval for `[parameter]` is 
+$[L, U]$.
+
+**Block B — Interpretation**
+
+With $[1-\alpha]$% confidence, the true value of `[parameter]` lies in the 
+interval $[L, U]$. This means that if we repeated the sampling and bootstrap 
+procedure many times, approximately $[1-\alpha]$% of the resulting intervals 
+would contain the true value of the parameter.
+
+**Block C — Length of the interval**
+
+The width of the interval is $U - L = [width]$ `[units]`, [representing 
+approximately [width/theta_orig · 100]% of the point estimate]. A `[narrow / 
+wide]` interval suggests a `[precise / imprecise]` estimate, which reflects 
+the [combined effect of the sample size, the variability in the data, and the 
+inherent variability of the chosen estimator].
+
+**Block D — Substantive conclusion**
+
+[For a difference of means/medians:]
+
+Since the interval `[does / does not]` include zero, the difference between 
+`[group_A]` and `[group_B]` is `[statistically significant / not statistically 
+significant]` at the $[α]$% level. Practically, this means that the observed 
+difference of $[diff]$ is `[likely / unlikely]` to be due to random sampling 
+variability alone.
+
+[For a correlation:]
+
+Since the interval `[does / does not]` include zero, the linear association 
+between `[X]` and `[Y]` is `[statistically significant / not statistically 
+significant]` at the $[α]$% level. The plausible range of values for the true 
+correlation is `[L, U]`, suggesting `[a weak / moderate / strong]` association.
+
+[For a single mean or SD:]
+
+The interval $[L, U]$ provides plausible values for the true population 
+parameter, which can be used for substantive interpretation in the application 
+context.
+
+---
+
+### Template 5 — Plot of the bootstrap distribution with annotations
+
+### Standard template — bootstrap of a single statistic
+
+The histogram represents the bootstrap distribution of the estimator $\hat\theta = 
+[describe statistic]$, obtained from $B = [B]$ replications of resampling with 
+replacement from the original sample. The values taken by the bootstrap estimates 
+range from a minimum of $[min]$ to a maximum of $[max]$. The distribution is 
+approximately [symmetric / asymmetric] around a central peak, located at the 
+value of $[mean_boot]$, which coincides with both [the original sample estimate / 
+the mean of the $B$ bootstrap estimates]. The spread of the distribution reflects 
+the magnitude of the bootstrap standard error, $\widehat{SE}_{\text{boot}} = [SE]$.
+
+### Standard template — bootstrap with annotation of original estimate and bootstrap mean
+
+The histogram of the bootstrap distribution shows the variability of the 
+estimator $\hat\theta$ across $B = [B]$ resamples of size $n = [n]$ drawn from 
+the original sample. The values range from $[min]$ to $[max]$, with a central 
+peak around $[mean_boot]$.
+
+The two vertical lines correspond to the **original sample estimate** ($\hat\theta = 
+[theta_orig]$, in [color]) and to the **mean of the $B$ bootstrap replicates** 
+($\bar{\hat\theta^*} = [mean_boot]$, in [color]). The two values are practically 
+[coincident / very close], in agreement with the expected behaviour of the 
+nonparametric bootstrap: the bootstrap distribution is centered, in expectation, 
+on the original sample estimate. The width of the histogram around these two 
+lines provides a visual representation of the standard error of the estimator.
+
+### Template — bootstrap with confidence interval bounds added
+
+The histogram of the bootstrap distribution is reported below, with vertical lines 
+indicating the original sample estimate ($[theta_orig]$, in red), the mean of the 
+$B$ bootstrap estimates ($[mean_boot]$, in blue), and the lower and upper bounds 
+of the $[1-\alpha]$% percentile confidence interval ($[L]$ and $[U]$, in green, 
+dashed).
+
+The shape of the distribution is approximately [symmetric and bell-shaped / 
+asymmetric / right-skewed / left-skewed], with the original estimate falling 
+[in the center of / near one edge of] the bootstrap distribution. The confidence 
+interval [$L$, $U$] covers approximately the central $[1-\alpha]$% of the bootstrap 
+mass and represents a range of values centered around the point estimate of the 
+parameter.
+
+[Always close with substantive interpretation:]
+
+It is worth noting that $[1-\alpha]\%$ is not the probability that the point 
+estimate falls within the interval. Rather, we are confident at the 
+$[1-\alpha]\%$ level that the true parameter falls within this range. The 
+[narrow / wide] width of the interval reflects [a good / a limited] precision 
+in estimating the parameter.
+
+### Template — bootstrap of a discrete statistic (e.g., median on small sample)
+
+The histogram of the bootstrap distribution of the [median difference / median] 
+shows a noticeable feature compared to the case of the [mean / smooth statistic]: 
+the distribution takes only a **small number of distinct values**, with several 
+isolated bars and gaps. This is a known characteristic of the nonparametric 
+bootstrap when applied to **non-smooth statistics** — such as medians or 
+quantiles — computed on small samples. Since the bootstrap can only reproduce 
+values already present in the original sample, the set of possible outcomes for 
+quantile-based statistics is limited, and the bootstrap distribution becomes 
+discrete rather than smooth.
+
+The two vertical lines, representing the original estimate ($[theta_orig]$) and 
+the bootstrap mean ($[mean_boot]$), [are close to each other / show a small 
+discrepancy], with both falling near the most frequently observed bootstrap 
+value. In such cases, the percentile confidence interval may be wider and more 
+discrete than the corresponding interval for the mean.
+
+### Template — bootstrap distribution with outlier influence
+
+The histogram of the bootstrap distribution shows a clear [right / left] 
+asymmetry, with a [longer / shorter] [right / left] tail. This asymmetry is 
+consistent with the presence of the [outlier / unusual observation] identified 
+in the descriptive analysis: bootstrap resamples that include this observation 
+multiple times produce estimates that deviate substantially from the central 
+mass of the distribution, contributing to the [skewness / heavy tail / 
+bimodality].
+
+This pattern justifies the use of the **percentile method** for the construction 
+of the confidence interval, as it directly reflects the actual shape of the 
+bootstrap distribution. A symmetric (Wald-type) interval, $\hat\theta \pm 1.96 
+\cdot \widehat{SE}$, would impose a symmetry not present in the data and could 
+yield biased coverage
+---
+
+### Template 6 — Comparing percentile CI vs symmetric CI (if relevant)
+
+**Block A — Setup**
+
+The percentile-based bootstrap CI for `[parameter]` is $[L_{perc}, U_{perc}]$, 
+while the symmetric Wald-type CI would be $\hat\theta \pm 1.96 \cdot 
+\widehat{SE}_{\text{boot}} = [L_{sym}, U_{sym}]$.
+
+**Block B — Comparison**
+
+[If similar:] The two intervals are very close, indicating that the bootstrap 
+distribution of $\hat\theta$ is approximately symmetric and roughly normal. 
+In this case, the two methods produce comparable inferential conclusions.
+
+[If different:] The two intervals differ noticeably: $[L_{perc}, U_{perc}]$ 
+(percentile) vs $[L_{sym}, U_{sym}]$ (symmetric). The percentile interval 
+reflects the actual shape of the bootstrap distribution, which is 
+`[asymmetric / has heavy tails / shifted]`, while the symmetric interval 
+imposes a symmetric form that does not match the data. The percentile 
+interval is therefore preferable in this case, as it captures the true 
+sampling variability of the estimator more accurately.
 ### Trappole comuni
 
 - **Resampling senza ripetizione** è inutile: produrrebbe solo permutazioni del campione originale, $\hat\theta$ non cambierebbe (è simmetrico nei dati)
@@ -1332,7 +1853,7 @@ abline(intercept + beta1, beta2, col = "blue")
 ```
 
 
-```{r}
+```{r, eval=FALSE}
 # scatterplot with non-parallel fitted lines (different slopes per group)
 library(ggplot2)
 

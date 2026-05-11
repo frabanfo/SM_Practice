@@ -1,0 +1,223 @@
+---
+title: "Es12"
+output: html_document
+date: "2026-05-11"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Consider the following data, measuring the processing times (in milliseconds) for 8
+files uploaded to two different servers:
+• Processing time (in ms) with Server A: 176, 125, 152, 180, 159, 168, 160, 151;
+• Processing time (in ms) with Server B: 164, 121, 137, 169, 144, 145, 156, 139.
+
+```{r}
+serverA = c(176, 125, 152, 180, 159, 168, 160, 151)
+serverB = c(164, 121, 137, 169, 144, 145, 156, 139)
+```
+
+### 12.1 Illustrate the data using appropriate descriptive statistics and graphical representations.
+
+```{r}
+summary(serverA)
+```
+
+```{r}
+summary(serverB)
+```
+
+The descriptive statistics show that server B is slightly faster than server A in response time: on average, server B takes 12 seconds less than server a to process the considered files.
+In server A, half of the files are processes whithin 159.5 seconds, while in server B half of them are processed whithin 144.5 seconds, with a difference of 15 seconds. The analysis
+of quartiles also confirms this result; in particular, using server B each file is processed in
+less than 170 ms (maximum equal to 169 ms), while only 75% of these require less than 170
+ms with server A (third quartile equal to 170 ms).
+
+```{r}
+round(sd(serverA), 3)
+round(sd(serverB), 3)
+```
+The calculation of standard deviations finally shows that the processing time related to server A has slightly higher variability than that associated with server B. Note however that the
+observations are few and the sample may not be sufficiently representative of the population.
+
+```{r}
+plot(serverA, serverB, xlab = "Server A", ylab = "Server B")
+abline(a = 0, b = 1)
+
+```
+We observe that all the points lie below the bisector, indicating that for all eight files considered, server B performs better. We also note that a single point deviates significantly from
+all the others, indicating a significantly lower processing time.
+
+### 12.2 Consider the difference between the two arithmetic means as the parameter of interest. Apply the bootstrap method using 1000 bootstrap replications and the bootstrap function to obtain the standard error for this difference. Comment on the result
+
+```{r}
+require(bootstrap)
+set.seed(130)
+n <- length(serverA)
+aux_fun <- function(ind) {
+A.boot <- serverA[ind]
+B.boot <- serverB[ind]
+mean(A.boot) - mean(B.boot)
+}
+mean.boot <- bootstrap::bootstrap(x = 1:n,
+                                  nboot = 1000,
+                                  theta = aux_fun)
+theta_boot <- mean.boot$thetastar  
+summary(mean.boot$thetastar)
+```
+Considering 1000 bootstrap repetitions, the difference between the means with servers A and B varies from a minimum of 6 to a maximum of almost 20. The average value of the
+difference is instead equal to 12, approximately equal to the median. Both indices coincide with the value of the difference between the means calculated on the original sample.
+
+```{r}
+se_boot <- sd(theta_boot)
+round(se_boot, 3)
+```
+
+The bootstrap standard error is computed as the standard deviation of the $1000$ bootstrap estimates: $\widehat{SE}_{\text{boot}} = 2.119$. This represents 
+approximately 17.66% of the magnitude of the original estimate, suggesting a moderate level of precision. 
+
+```{r}
+Mean1 <- mean(serverA) - mean(serverB)
+
+hist(theta_boot,
+     breaks = 40,
+     freq = FALSE,                           # densità invece di frequenze
+     col = "lightgray", border = "white",
+     main = "Bootstrap distribution",
+     xlab = "Stima bootstrap",
+     ylab = "Densità")
+
+# linea verticale alla stima originale
+abline(v = c(Mean1), col = "red", lwd = 2, lty = 1)
+
+# linea verticale alla media delle B stime bootstrap
+abline(v = mean(theta_boot), col = "blue", lwd = 2, lty = 2)
+
+legend("topright",
+       legend = c("Stima originale", "Media bootstrap", "CI bounds"),
+       col = c("red", "blue", "green"),
+       lty = c(1, 2, 2), lwd = 2,
+       cex = 0.7)
+```
+
+
+The histogram of the bootstrap distribution shows the variability of the 
+estimator $\hat\theta$ across $B = 1000$ resamples of size $n = 8$ drawn from 
+the original sample. The values range from $6$ to $19.5$, with a central 
+peak around (`r round(mean(theta_boot), 2)`, in red).
+
+The two vertical lines correspond to the **original sample estimate** (`r round(Mean1, 2)`, in red) and to the **mean of the $B$ bootstrap replicates** 
+($\bar{\hat\theta^*} = 12.11`$, in [color]). The two values are practically 
+[coincident / very close], in agreement with the expected behaviour of the 
+nonparametric bootstrap: the bootstrap distribution is centered, in expectation, 
+on the original sample estimate. The width of the histogram around these two 
+lines provides a visual representation of the standard error of the estimator.
+
+### 12.4 Compute a 95% confidence interval using the percentile method. Comment on the length of the interval and on the plausible values of the parameter.
+```{r}
+ci <- quantile(theta_boot, c(0.025, 0.975))
+ci
+```
+The 95% confidence interval for the difference is therefore [8.13, 16.25]. It represents a range of values centered around the point estimate of the parameter. Note that 0.95 is not the
+probability that the point estimate falls within the interval: instead, we are confident at 95%-level that the true parameter falls within this interval.
+
+### 12.5 Apply the bootstrap method as in point 7.1, but consider the difference between the two medians as the estimator of interest. Plot the bootstrap distribution and comment on the shape.
+
+```{r boot-plot, eval=FALSE}
+
+set.seed(130)
+n <- length(serverA)
+aux_fun <- function(ind) {
+A.boot <- serverA[ind]
+B.boot <- serverB[ind]
+median(A.boot) - median(B.boot)
+}
+median.boot <- bootstrap::bootstrap(x = 1:n,
+                                  nboot = 1000,
+                                  theta = aux_fun)
+theta_boot <- median.boot$thetastar  
+
+median1 <- median(serverA) - median(serverB)
+
+hist(theta_boot,
+     breaks = 40,
+     freq = FALSE,                           # densità invece di frequenze
+     col = "lightgray", border = "white",
+     main = "Bootstrap distribution",
+     xlab = "Stima bootstrap",
+     ylab = "Densità")
+
+# linea verticale alla stima originale
+abline(v = median1, col = "red", lwd = 2, lty = 1)
+
+abline(v = median(theta_boot), col = "blue", lwd = 2, lty = 2)
+
+legend("topright",
+       legend = c("Stima originale", "median bootstrap"),
+       col = c("red", "blue"),
+       lty = c(1, 2, 2), lwd = 2,
+       cex = 0.7)
+```
+In this case, from the histogram of the bootstrap distribution, it is noted that the differences
+between the medians calculated on the bootstrap samples tend to assume only a small
+number of values. For example, a high number of differences are observed with a value
+between 13 and 15 and almost none between 15 and 17. This can be explained by the small
+number of originally available observations: the bootstrap tends to repeat the observations
+and therefore also the values of the final result. In this case, with the bootstrap, it is not
+feasible to estimate some quantiles of the distribution.
+
+### 12.6 For the estimator considered in the previous point (difference between the medians) compute a 90% confidence interval. Comment on the result.
+```{r}
+ci <- quantile(theta_boot, c(0.05, 0.95))
+ci
+```
+According to the obtained confidence interval, we are confident at 90%-level that the true
+parameter lies between 8 and 23. We observe that in this case the confidence interval is quite
+wide, covering almost completely the range of the 1000 bootstrap values. The difference
+computed on the original sample lies approximately in the middle of the obtained interval.
+
+### 12.7 Plot the histogram of the bootstrap distribution, adding vertical lines corresponding to the lower and upper bounds of the confidence interval, include a legend.
+
+
+```{r boot-plot1, eval=FALSE}
+
+set.seed(130)
+n <- length(serverA)
+aux_fun <- function(ind) {
+A.boot <- serverA[ind]
+B.boot <- serverB[ind]
+median(A.boot) - median(B.boot)
+}
+median.boot <- bootstrap::bootstrap(x = 1:n,
+                                  nboot = 1000,
+                                  theta = aux_fun)
+theta_boot <- median.boot$thetastar  
+
+median1 <- median(serverA) - median(serverB)
+
+hist(theta_boot,
+     breaks = 40,
+     freq = FALSE,                           # densità invece di frequenze
+     col = "lightgray", border = "white",
+     main = "Bootstrap distribution",
+     xlab = "Stima bootstrap",
+     ylab = "Densità")
+
+# linea verticale alla stima originale
+abline(v = median1, col = "red", lwd = 2, lty = 1)
+
+abline(v = median(theta_boot), col = "blue", lwd = 2, lty = 2)
+abline(v = ci, col = "green", lwd = 2, lty = 2)
+legend("topright",
+       legend = c("Stima originale", "median bootstrap", "ci"),
+       col = c("red", "blue", "green"),
+       lty = c(1, 2, 2), lwd = 2,
+       cex = 0.7)
+```
+
+The plot confirms the broad range of the confidence interval, which includes most of the
+bootstrap estimates for the difference between medians: only along the left-hand side of the
+distribution are some values observed outside the interval. Both the value of the difference
+calculated on the original dataset and the mean of the 1000 differences calculated with the
+bootstrap method fall in the central area of the interval.
