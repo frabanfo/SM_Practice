@@ -1435,6 +1435,18 @@ interpretation].
 - **[var3]** ($\hat{\beta}_3 = [value]$): [if non-significant: discussion of 
   why this might be — multicollinearity, sample size, etc.]
 
+The estimated standard errors of the regression coefficients are reported 
+in the second column of the `summary()` output. They quantify the **precision** 
+of each coefficient estimate: smaller standard errors correspond to more 
+precise estimates.
+
+The intercept has standard error `[SE_intercept]`, while the slope coefficients 
+have standard errors ranging from `[SE_min]` to `[SE_max]`. The covariates 
+with the `[smallest / largest]` standard error are `[cov_names]`, indicating 
+that their effects are estimated with the highest precision. Conversely, 
+`[other covariates]` have larger standard errors, reflecting greater 
+uncertainty in their estimates.
+
 ### Goodness of fit and global test
 
 The model explains $[R²×100]\%$ of the variance in $[response]$ 
