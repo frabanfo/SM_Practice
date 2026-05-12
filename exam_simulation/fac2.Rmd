@@ -1,0 +1,41 @@
+---
+title: "fac2"
+author: "me"
+date: "2026-05-12"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 6,
+  fig.height = 4,
+  fig.align = "center"
+)
+```
+
+```{r libraries, eval=FALSE}
+# Caricamento librerie usate nel corso
+library(MASS)       # stepAIC, Boston dataset
+library(car)        # vif, diagnostica
+library(corrplot)   # visualizzazione matrici di correlazione
+library(boot)       # bootstrap
+library(ppcor)      # correlazioni parziali
+library(GGally) 
+library(mvtnorm)
+library(ggplot2)
+library(skimr)
+library(gridExtra)
+```
+
+Data available in water.Rdata11 report concentrations of organic substances in sampled waters. The following records are available: Organic: concentration of organic substances in water (expressed in mg/L); Material: type of material of the
+tank storing the water: 0 if plastic, 1 if steel Flow: water flow rate (in liters per minute); Temperature: external temperature (in degrees Celsius).
+
+```{r}
+water = load('data/water.Rdata')
+```
+
+
+

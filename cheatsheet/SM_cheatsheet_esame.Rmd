@@ -722,7 +722,27 @@ ggpairs(df)
 # sotto diagonale: scatterplot
 # sopra diagonale: correlazioni con livelli di significatività
 ```
- 
+
+### Standard template — bivariate scatterplot
+
+The scatterplot reports the joint distribution of [VAR_Y] and [VAR_X] for 
+the $n = [n]$ observations in the sample, with [VAR_X] on the horizontal 
+axis and [VAR_Y] on the vertical axis.
+
+The points show [a clear / a moderate / a weak / no apparent] linear 
+association between the two variables: as [VAR_X] increases, [VAR_Y] tends 
+to [increase / decrease / remain constant]. The relationship appears 
+approximately **[linear / non-linear]**, with [no evident curvature / a 
+slight curvature / a clearly non-linear pattern]. The strength of the 
+association can be described as **[strong / moderate / weak]**.
+
+The dispersion of the points around the underlying trend is [small / 
+moderate / large / increasing with VAR_X], suggesting [low / moderate / high] variability in the relationship.
+
+[Optional: one sentence on a specific feature if relevant — outlier, 
+heteroscedasticity, curvature, but only if it's worth mentioning.]
+
+
 ### Visualizzazione matrici di correlazione: corrplot
  
 ```{r corrplot, eval=FALSE}
@@ -907,11 +927,11 @@ Più compatto, è quello che usa Brusa nelle Solutions:
 library(bootstrap)
 
 set.seed(7369)
-n <- length(x)
+n <- length(x) /nrow se df
 
 # funzione ausiliaria: prende indici, restituisce la statistica
 aux_fun <- function(ind) {
-  mean(x[ind])                               # sostituire con la statistica di interesse
+  mean(x[ind])                              # sostituire con la statistica di interesse
 }
 
 result_boot <- bootstrap::bootstrap(x = 1:n,
@@ -1429,10 +1449,39 @@ with $[response]$ at this confidence level.
 
 ### Preliminary residual analysis
 
-The residuals range from $[Min]$ to $[Max]$ with median $[Median]$. The IQR is 
-$[Q1, Q3]$. [Comment on symmetry / asymmetry, with reference to ratio range/IQR 
-and connection to expected diagnostic plot patterns.] A formal assessment of 
-the model assumptions will be performed in the diagnostic plots section.
+The [raw / deviance] residuals range from `[Min]` to `[Max]`, with median 
+`[Median]` — `[close to / not close to]` zero, as expected for a 
+[regression / logistic] model with intercept. The interquartile range 
+`[Q1, Q3]` is `[approximately centered on / shifted away from]` zero, 
+indicating `[symmetry / asymmetry]` in the bulk of the distribution.
+
+[Pick the variant matching what you observe:]
+
+**Variant A — symmetric residuals:** The residuals appear approximately 
+symmetric around zero, with $|Min| \approx |Max|$ and $|Q1| \approx |Q3|$. 
+The ratio between total range and IQR is approximately `[range/IQR]`, 
+consistent with a roughly normal-like distribution. No major concerns 
+emerge at this preliminary stage.
+
+**Variant B — right-skewed (Max >> |Min|):** The maximum residual (`[Max]`) 
+is noticeably larger in absolute value than the minimum (`[Min]`), 
+indicating a slight positive asymmetry in the tails. This may suggest one or 
+more observations that the model `[underpredicts / fails to capture]`, 
+which warrants verification in the diagnostic plots and Cook's distance.
+
+**Variant C — left-skewed (|Min| >> Max):** The minimum residual is larger 
+in absolute value than the maximum, indicating a slight negative asymmetry 
+in the tails. This pattern will be further examined via the Q-Q plot to 
+assess whether it is a substantial deviation from normality or attributable 
+to a single extreme observation.
+
+### One-line tail closure (optional, useful)
+
+For a full assessment of the assumptions, refer to the diagnostic plots 
+(`plot(mod)`) and the analysis of leverage / Cook's distance — preliminary 
+indications from the residual summary will be confirmed (or revised) in 
+that step.
+
 
 ### Looking at the results in light of our initial research question:
 
@@ -1450,6 +1499,70 @@ the model assumptions will be performed in the diagnostic plots section.
 ---
 
 ## Diagnostics: residuals, leverage, Cook, VIF
+
+### Residuals vs continuous covariates
+
+```{r residuals-vs-covariates-base, eval=FALSE}
+res <- residuals(mod_final)        # deviance residuals (default for glm)
+
+par(mfrow = c(1, 2))
+
+plot(df$cov1, res,
+     main = "Residuals vs cov1",
+     xlab = "cov1 label",
+     ylab = "Deviance residuals",
+     pch = 16, col = "blue")
+abline(h = 0, lty = 2, col = "gray")
+
+plot(df$cov2, res,
+     main = "Residuals vs cov2",
+     xlab = "cov2 label",
+     ylab = "Deviance residuals",
+     pch = 16, col = "blue")
+abline(h = 0, lty = 2, col = "gray")
+
+par(mfrow = c(1, 1))
+```
+
+### What to look for
+
+| Pattern | What it suggests |
+|---------|------------------|
+| Random cloud around 0 | Linearity OK, no concerns |
+| Curved (U-shape, parabola) | Non-linear relationship — add quadratic term or transform |
+| Monotonic trend | Model systematically over/under-predicts at certain covariate values |
+| Funnel shape (variance grows with covariate) | Heteroscedasticity |
+| Isolated extreme points | Potential outliers — check Cook's distance |
+
+### Note for logistic regression
+
+In `glm` with binary response, deviance residuals often form **two horizontal 
+bands** — one above zero (for observations with $y = 1$) and one below 
+(for $y = 0$). This is expected and **not** a violation of model assumptions. 
+What you look for is whether each band shows systematic trends or whether 
+specific points lie far from both bands.
+
+### Comment template
+
+The two scatterplots show the residuals of the selected model against the 
+continuous covariates `[cov1]` and `[cov2]`.
+
+**Residuals vs `[cov1]`**: The residuals are [scattered randomly / show a 
+clear pattern] around zero, with [no apparent / a slight / a clear] trend 
+across the range of `[cov1]`. The dispersion appears [approximately constant 
+/ to increase / to decrease] with `[cov1]`. [No specific concern / A pattern 
+that warrants investigation] emerges from this plot.
+
+**Residuals vs `[cov2]`**: The residuals against `[cov2]` show [a similar 
+random pattern / a non-linear shape / clear heteroscedasticity]. 
+[Specific observation: e.g., "a small group of observations with high `[cov2]` 
+shows larger positive residuals, suggesting that the model underpredicts the 
+response for these units"].
+
+Overall, the residual plots [support / call into question] the assumption 
+of linearity of the [response / logit] in the continuous covariates. 
+[Optional: "Possible remedies include adding a quadratic term, a log 
+transformation of the covariate, or using a more flexible model."]
 
 ### The four diagnostic plots
 
@@ -2471,6 +2584,9 @@ fitted_probs <- predict(mod_final, type = "response")
 # classificazione con soglia 0.5 e matrice di confusione
 predicted_class <- ifelse(fitted_probs > 0.5, 1, 0)
 table(predicted = predicted_class, observed = df$y)
+
+# per prendere prime x
+fitted_probs[1:x]
 ```
 
 | Tipo | Output | Comando R |

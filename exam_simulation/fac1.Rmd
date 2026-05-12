@@ -1,0 +1,240 @@
+---
+title: "Fac_simile1"
+author: "Francesco Banfi"
+date: "2026-05-12"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 6,
+  fig.height = 4,
+  fig.align = "center"
+)
+```
+
+```{r libraries, eval=FALSE}
+# Caricamento librerie usate nel corso
+library(MASS)       # stepAIC, Boston dataset
+library(car)        # vif, diagnostica
+library(corrplot)   # visualizzazione matrici di correlazione
+library(boot)       # bootstrap
+library(ppcor)      # correlazioni parziali
+library(GGally) 
+library(mvtnorm)
+library(ggplot2)
+library(skimr)
+library(gridExtra)
+
+```
+
+The following variables, which can be found in cars.Rdata, were collected for a group of 50 cars in the 1920s:
+• measurement of speed (speed, in kilometers per hour)
+• distance taken to stop (dist, in meters)
+
+```{r}
+load('data/cars.Rdata')
+head(cars)
+```
+### 1) Illustrate the data using appropriate summary statistics. Draw the bivariate scatter plot and comment on it. Are the variables related to each other? Calculate and comment on the value of the sample linear correlation coefficient
+
+```{r}
+skimr::skim_without_charts(cars)
+```
+```{r}
+IQR(cars$speed)
+IQR(cars$dist)
+
+```
+The dataset consists of 50 obseravations composed of two numerical variables (speed and dist), and it does not have missing values.
+
+Looking at the descriptive statistics of the speed variable we can see that the mean value is 24.779 and the median is 24.135, that means that half of the speed times are below it: their similarity suggests that the distribution is approximately symmetric around the central value.
+
+Regarding variability, the standard deviation is 8.508, indicating that the observations deviate on average by approximately 8.508 units from the mean. 
+The interquartile range is 11.263, with one-quarter of the observations below 19.308 and another quarter above 30.571. The total range is from 6.436 to 40.225.
+
+For the dist variable, we can see that the mean value is 13.099 and the median is 10.972, with a difference slightly bigger then 2 units: this suggests that the distribution is slighly right skewned, with possible high values that inflate the mean (max dist value = 36.574).
+
+Regarding variability, the standard deviation is 7.854, indicating that the observations deviate on average by approximately 7.854 units from the mean. 
+The interquartile range is 9.143554, with one-quarter of the observations below 7.924 and another quarter above 17.068. The total range is from 0.609 to 36.574).
+
+
+```{r}
+plot(cars[, 1], cars[, 2], col = "blue", main = "Scatter plot",
+xlab = "First component (speed)", ylab = "Second component (dist)")
+
+```
+
+The scatter plot reports the joint distribution of speed and distance of stopping for the $n = 50$ observations in the sample, with the speed values on the horizontal axis and distance of stopping on the vertical axis.
+
+The points show a clear linear association between the two variables: as the speed increases, the space that the car needs to use to stop itself tends to increase. The relationship appears
+approximately **linear**, with no evident curvature.
+
+The dispersion of the points around the underlying trend is generally small with a little increse on the higher speeds, suggesting a low to moderate variability in the relationship.
+
+```{r}
+cor(cars$speed, cars$dist)
+
+```
+As expected from the scatter plot seen before, we got a value for the correlation of 0.807, indicating a strong correlation between the two varibles and this confirms our hypotesis that an higher speed needs a bigger braking distance to stop.
+
+### 2) Considering the correlation coefficient as a parameter of interest, use the nonparametric bootstrap to provide an accuracy measure for it. Obtain the bootstrap distribution from B = 1000 resamples and comment on the bootstrap estimate of the corresponding standard error
+
+```{r}
+library(bootstrap)
+
+set.seed(7369)
+n <- nrow(cars)
+
+# funzione ausiliaria: prende indici, restituisce la statistica
+aux_fun <- function(ind) {
+  cor(cars$speed[ind], cars$dist[ind])                               # sostituire con la statistica di interesse
+}
+
+result_boot <- bootstrap::bootstrap(x = 1:n,
+                                    nboot = 1000,
+                                    theta = aux_fun)
+
+# accesso alle B stime bootstrap
+theta_boot <- result_boot$thetastar
+summary(theta_boot)
+```
+The accuracy of the estimator $\hat\theta = $ correlation is assessed via the nonparametric bootstrap with $B = 1000$ replications. This procedure allows estimation of the standard error and the construction of confidence intervals without relying on distributional assumptions, which is particularly 
+useful given the quite small sample size.
+
+The $B = 1000$ bootstrap estimates of $\hat\theta$ range from 0.573 to 0.916, with mean 0.806 and median 0.8119. Both the mean and median of the bootstrap distribution are very close to the original sample estimate $\hat\theta = 0.807$, in agreement with the general property that the bootstrap distribution is centered (in expectation) on the original sample estimate.
+
+```{r}
+se_boot <- sd(theta_boot)
+round(se_boot, 3)
+
+round(100 * se_boot /  0.807, 2)  
+```
+The bootstrap standard error is computed as the standard deviation of the $B$ bootstrap estimates: $\widehat{SE}_{\text{boot}} = 0.048$. This represents 
+approximately `5.99%` of the magnitude of the original 
+estimate, suggesting a quite high level of precision. 
+
+### 3) Provide the bootstrap percentile confidence interval for the parameter computed at 99% confidence level. Comment on its value and length. Depict the bootstrap distribution for the parameter of interest and add the lower and upper bound of the confidence interval. Comment on the shape of the distribution.
+
+```{r}
+ci_99 <- quantile(theta_boot, probs = c(0.005, 0.995))
+round(ci_99, 3)
+```
+In our case, the $99$% confidence interval for the correlation is $[0.626 , 0.897]$.
+
+**Interpretation**
+With $[99]$% confidence, the true value of the correlation lies in the interval $[0.626 , 0.897]$. This means that if we repeated the sampling and bootstrap procedure many times, approximately $99$% of the resulting intervals would contain the true value of the parameter.
+
+**Length of the interval**
+
+The width of the interval is $0.897 - 0.626 = 0,271$, [representing approximately 0,271/0.807 · 100]% of the point estimate]. A narrow interval suggests a precise estimate, which reflects the combined effect of the sample size.
+
+### 4) What does it mean when we refer to homoscedasticity in the context of a multiple linear regression model? How do we check this assumption empirically?
+
+
+
+## Exercise 2
+Data concerning the birth weight of a sample of infants2
+can be found in bwt.Rdata.
+The interest lies in explaining factors that influence the birth weight lower than 2.5 kg.
+Key variables include:
+• low: 1 = if the birth weight is lower than 2.5 kg, 0 otherwise
+• age: mother’s age in years
+• lwt: mother’s weight in kilograms at last menstrual period
+• race: mother’s race (0 = White, 1 = Black, 2 = Others)
+• smoke: smoking status during pregnancy (0 = No, 1 = Yes)
+• ht: history of hypertension (0 = No, 1 = Yes)
+• ftv: number of physician visits during the first trimester (0, 1, or more than 1)
+
+```{r}
+load('data/bwt.Rdata')
+```
+
+### 2.1 .1 Define the sample size. Provide the relative frequencies of the contingency table referred to race and smoke with the response variable. Comment on the values
+
+```{r}
+sample_size = nrow(bwt)
+
+# contingency tables (absolute frequencies)
+table(bwt$low, bwt$race)
+table(bwt$low, bwt$smoke)
+
+```
+
+```{r}
+# relative frequencies (by column = within each level of the covariate)
+round(prop.table(table(bwt$low, bwt$race), margin = 2), 3)
+round(prop.table(table(bwt$low, bwt$smoke), margin = 2), 3)
+
+```
+The contingency table for underweight childrens (variable low) vs race shows that for race = white we have 23 underweight childrens out of 96 subjects with a rate of 0.24 (`24%`), meanwhile when we have race = black we got 11 cases out of 26 with a rate of (`42.3%`). We got also another case, when race = other, where we got 25 cases of underweight out of 67, with a rate of 0.405 (40.05%). 
+
+
+The contingency table for underweight childrens (variable low) vs smoke factor shows that for non smokers we have 29 underweight children out of 115 subjects, with a rate of 0.252(25.2%), compared to  30 out of 74 (`40.5%`) for non smokers. 
+
+We can see  a difference in proportions between the race groups that suggests in this sample the race is likely to be associated with the response. The same can be told about smokers, where the proportion of underweight children is around 15% higher than the counterpart of non smokers.
+
+### 2) Fit a logistic regression model using all the available covariates and perform model selection. Comment on the results of this procedure
+
+
+```{r}
+mod.full <- glm(bwt$low ~ .,
+            data   = bwt,
+            family = binomial)
+
+step(mod.full, trace = TRUE)
+
+```
+Stepwise selection based on AIC was performed starting from the full model with 6 covariates: age + lwt + race + smoke + ht + ftv. At each iteration the procedure evaluated backward moves, retaining the candidate that minimized the AIC.
+
+At step 1, the variable ht was removed, lowering the AIC from $225.38$ to $221.88$. At step 2, the variable age was further removed, lowering the AIC from $225.38$ to $221.88$, with an improve of around 4 points. The procedure terminated at step 3 when no further removal improved the criterion (AIC).
+
+The **final selected model** includes 4 covariates: lwt + race + smoke + ht with AIC = $220.25$, slightly lower than the initial AIC of $225.38$. The removed covariates — age and ftv, representing the age of the mother(numerical) and number of physician visits during the first trimester — did not provide enough explanatory power to justify their inclusion in the model.
+
+### 3) Estimate the model selected at the previous point. Report and comment carefully on the estimated regression coefficients. Which is the estimated probability of the first six sample units? Comment on this values.
+
+```{r}
+mod.C = glm(bwt$low ~ lwt + race + smoke + ht,
+            data   = bwt,
+            family = binomial)
+summary(mod.C)
+```
+**Model equation**
+
+The estimated logistic regression model is:
+
+$$
+\text{logit}(\hat p_i) = 0.35205 + -0.03948 \cdot lwt + 1.28766     \cdot raceblack + 0.94364 \cdot raceother + 1.07157 \cdot smoke1 +  1.74916 \cdot ht1
+$$
+
+**Coefficient interpretation**
+
+The **intercept** ($\hat\beta_0 = 0.353$) is not statistically significant at (z = 0.381, p-value = 0.70333). It represents the log-odds of having an underweight children for an individual with all covariates equal to zero. Since this combination is not meaningful in context, the intercept does not have a substantive interpretation.
+
+The coefficient of **`lwt`** ($\hat\beta_k = -0.039$) is negative and statistically significant at the 0.01% level (z = -2.634, p-value = 0.00844).
+
+This indicates that lwt is negatively associated with the probability of having an underweight baby: higher values of the weight of the mother on the last menstrual period correspond to lower odds of having an underweight child, holding the other covariates constant. The corresponding odds ratio is $\exp(-0.039) \approx 0,96$, meaning that a one-unit increase in lwd multiplies the odds by a factor of 0.96: this resulted as significative as this is for each kg of weight increase: since the weight number is usually a "big number", an increase of a few kg on the weight of the mother will result in a quite important decrease in the probability of having an underweight child.
+
+
+The coefficients of **raceblack`** and  **raceother**($\hat\beta_k = 1.29$, $\hat\beta_k = 0.94364    $) are positive and **statistically significant at the 95% level **.
+
+This indicates that raceblack and raceother are positively associated with the probability of having an underweight child, as we noticed also from the previous frequencies that we have computed: unit values of these correspond to higher odds of having an underweight children, holding the other covariates constant. The corresponding odds ratio are 3,63 and 2,55, meaning that on average, raceblack multiplies the odds by a factor of 3.63, while raceother by a factor of 2.55.
+
+The coefficient of **smoke1** ($\hat\beta_k = 1.07$) is positive and statistically significant at the 99% level .
+
+This indicates that the smoking factor is positively  associated with the probability of having an underweight child: The corresponding odds ratio is $2,91$, meaning that being a smoker multiplies the odds by a factor of 2.91 
+
+Lastly, the coefficient of **ht1** ($\hat\beta_k = 1.75$) is positive and statistically significant at the 95% level .
+
+This indicates that the hypertension factor is positively  associated with the probability of having an underweight child: The corresponding odds ratio is $5,75$, meaning that being a smoker multiplies the odds by a factor of 5,75
+
+```{r}
+fitted_probs <- predict(mod.C, type = "response")
+fitted_probs[1:6]
+```
+For the first 6 sample units, we got all of the predicted probabilites of having an underweight baby under the value of 0.4: if we would apply a 0.5 classification threshold, the units would be predicted as class 0, so all of these would be classified as non underweight.
+
+

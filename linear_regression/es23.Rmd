@@ -132,19 +132,24 @@ The global F-test yields $F = 267.1$ on $p = 2$ and $53$ degrees of freedom
 ###23.6 Add the estimated parallel lines to scatterplot of the data and comment on the figure. Write the equations that characterize this model.
 
 ```{r interaction-plot, eval=FALSE}
-# scatterplot with separate fitted lines per group
 plot(whiteside$Temp, whiteside$Gas,
-     col = as.numeric(Whiteside$Insul),
+     col = as.numeric(whiteside$Insul),
      pch = 16,
      main = "Interaction visualization",
      xlab = "x1", ylab = "y")
-
-# add fitted lines for each group
-for (g in levels(Whiteside$Insul)) {
-  subset_g <- whiteside[Whiteside$Insul == g, ]
-  abline(lm(y ~ x1, data = subset_g),
-         col = which(levels(Whiteside$Insul) == g))
-}
-legend("topleft", legend = levels(Whiteside$Insul),
-       col = 1:nlevels(Whiteside$Insul), lty = 1, cex = 0.8)
+abline(6.551, -0.337, col = "brown")
+abline(6.551 - 1.565, -0.337, col = "blue")
 ```
+The variable `Insul` enters the model as a categorical predictor with two 
+levels — `Before` (reference) and `After`. R encodes it as a single dummy 
+$D_i$ equal to $1$ for after-insulation observations and $0$ for before. 
+The estimated coefficient $\hat\beta_{InsulAfter} = -1.57$ (with SE $= 
+0.20$, t = $-7.83$, p-value $< 0.001$) indicates that, holding the external 
+temperature constant, after-insulation observations show on average a gas 
+consumption $1.57$ cubic feet **lower** than before-insulation observations. 
+The effect is highly statistically significant.
+
+In substantive terms, this means that the insulation intervention is 
+associated with a reduction of approximately $1.57$ cubic feet of weekly 
+gas consumption, at any given outdoor temperature. The result is consistent 
+with our initial hypothesis that thermal insulation reduces heating demand.
