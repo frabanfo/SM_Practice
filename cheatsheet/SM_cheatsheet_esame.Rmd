@@ -89,7 +89,7 @@ skim_without_charts(data.frame(x = x))
 ```
 
 
-```{r}
+```{r, eval=FALSE}
 boxplot(df)
 plot(density(df))
 ```
@@ -181,8 +181,8 @@ tapply(df$var1, df$group, summary)
   robust to outliers.
 - **Range** (max - min): total spread. Compare with IQR: if much larger 
   (~ 4-6× IQR), there are extreme values in the tails.
-- **Coefficient of variation** ($\sigma/\mu$): dimensionless measure of 
-  variability, useful to compare across variables with different scales.
+- **Coefficient of variation** ($\sigma/\mu$): (CV)dimensionless measure of 
+  variability, useful to compare across variables with different scales. (soglie basso minore 0.1 medio 0.2 alto 0.3)
 
 > *Example phrasing*:
 > 
@@ -502,8 +502,28 @@ legend("topleft",
 
 **Comment template:**
 
-> The ECDF of the variable `[name]` shows a distribution [concentrated / spread out] around the value `[median]`, with [few / many] extreme values in the tails.
+The empirical cumulative distribution function (ECDF) of the variable 
+**[NAME]** estimates non-parametrically the underlying distribution by 
+reporting, for each value $x$, the proportion of observations not 
+exceeding it. By construction it is a non-decreasing step function valued 
+in $[0, 1]$, with jumps of size $1/n$ at each observed data point, and 
+by the Glivenko–Cantelli theorem it converges uniformly to the 
+theoretical CDF as $n$ grows.
 
+From the plot we observe that the ECDF is [steep around the central 
+values / gently sloped over a wide range], indicating a distribution 
+[concentrated / spread out] around [MEDIAN]. The curve crosses the level 
+$0.5$ at approximately $x = $ [MEDIAN], while the levels $0.25$ and 
+$0.75$ are reached at [Q1] and [Q3], giving an interquartile range of 
+[IQR]. The lower and upper tails approach $0$ and $1$ 
+[rapidly / gradually], suggesting [few / several] extreme values, and 
+the overall shape appears [symmetric / right-skewed / left-skewed] 
+around the median.
+
+
+IQR≪σ⋅1,35 (cioè IQR molto più piccolo del "IQR atteso" di una normale con quella σ) → ECDF molto steep al centro, code lunghe
+IQR≈1,35⋅σ → distribuzione circa normale, ECDF con la classica "S" simmetrica
+IQR≫1,35⋅σ → dati spalmati, ECDF gently sloped
 ---
 
 ### QQ-plot
@@ -543,9 +563,27 @@ par(mfrow = c(1, 1))
 
 **Comment template (exam):**
 
-> The QQ-plot of the [residuals / values] shows points [aligned on the reference line / deviating from the line in the tails]. I conclude that the distribution [is / is not] approximately normal, [with heavier tails / with positive asymmetry / ...].
+The quantile-quantile (QQ) plot compares the empirical quantiles of the 
+variable **[NAME]** with the theoretical quantiles of a reference 
+distribution (typically the standard normal): if the data follow the 
+assumed model, the points should lie approximately along the reference 
+line, while systematic departures from linearity reveal discrepancies 
+between the empirical and theoretical distributions.
 
-> Specifically, the presence of [observed pattern] suggests [diagnosis]. This [confirms / violates] the normality assumption required for [context: regression, test, ...].
+From the plot we observe that the points lie [closely along / 
+systematically off] the reference line, indicating that the distribution 
+of **[NAME]** is [well approximated by / not fully compatible with] the 
+[Normal / theoretical] distribution. In particular, the central portion 
+of the plot appears [aligned with / slightly off] the line, suggesting 
+that the bulk of the data is [consistent / not consistent] with the 
+reference model, while the [lower / upper / both] tail(s) show 
+[no noticeable deviation / a clear deviation], with points falling 
+[above / below] the line. This behavior is typical of a 
+[symmetric / right-skewed / left-skewed / heavy-tailed / light-tailed] 
+distribution. Overall, the QQ-plot suggests that the [Normal / theoretical] 
+assumption is [reasonable / questionable] for **[NAME]**, and this visual 
+assessment can be complemented by formal goodness-of-fit tests such as 
+Shapiro–Wilk test.
 
 #### Test formali di normalità (alternativa al QQ-plot)
 
@@ -578,6 +616,7 @@ sigma <- matrix(c(9, 2,
 # generazione
 X <- rmvnorm(n = 3000, mean = mu, sigma = sigma)
 # X è una matrice n × 2: una riga per realizzazione, una colonna per componente
+#se bivariate con stessa varianza - stesso iqr
 ```
  
 > **Attenzione alla parametrizzazione**: nella matrice `sigma` la diagonale contiene le **varianze**, non le deviazioni standard. Se ti viene dato $\sigma = 3$, devi inserire $\sigma^2 = 9$ in `sigma`.
@@ -594,7 +633,89 @@ R <- matrix(c(1.0, 0.7,        # matrice di correlazione
 D <- diag(sd_vec)
 sigma <- D %*% R %*% D         # Sigma = D R D
 ```
- 
+
+### Descriptive statistics
+```{r desc, eval=FALSE}
+summary(X)
+sd(X[, 1])
+
+sd(X[, 2])
+
+cov(X[, 1], X[, 2])
+```
+
+### Descriptive Statistics Comment Template — summary() and sd()
+
+The object returned in the output by the [FUNCTION_NAME] function is a 
+matrix with two columns and [N_OBS] rows: the two columns represent the two 
+components ([VAR_X] and [VAR_Y]) of the bivariate variable, while each row 
+corresponds to a different observation. We briefly analyze the generated 
+data by calculating its main descriptive statistics. Firstly, we recall 
+that the components of a bivariate Gaussian distributed random variable 
+have univariate Gaussian distributions; in this case, given the assigned 
+parameters, we expect [VAR_X] ~ N([MU_X], [VAR_X_VAL]) and 
+[VAR_Y] ~ N([MU_Y], [VAR_Y_VAL]). From the descriptive statistics we 
+observe that, for both univariate components, the mean and median assume 
+very similar values to each other and are approximately equal to [MU_X] 
+and [MU_Y] respectively, which correspond to the theoretical values 
+assigned to the means. The study of the quartiles also highlights the 
+[symmetry/asymmetry] of the data around the central values of the mean 
+and median, since the distance between Q1 and the median is 
+[comparable to / noticeably different from] the distance between the 
+median and Q3 for both components. In summary, the values generated for 
+both components appear to be [consistent / not fully consistent] with 
+those of a random variable having the required Gaussian distribution.
+
+The standard deviations of the two components, equal to sd([VAR_X]) = 
+[SD_X] and sd([VAR_Y]) = [SD_Y], are both very close to the assigned 
+theoretical values of [SD_X_TH] and [SD_Y_TH]; also in this case, the 
+values of the indices calculated on the simulated data are consistent 
+with the theoretical ones. Finally, the value of the covariance 
+(equal to [COV_XY]) is [slightly greater than / slightly smaller than / 
+very close to] the theoretical one ([COV_XY_TH]), and the corresponding 
+correlation coefficient ρ = [RHO] confirms that the two components are 
+[strongly / moderately / very weakly] linearly and 
+[positively/negatively] associated with each other.
+
+### Basic scatterplot
+```{r, eval=FALSE}
+plot(X[, 1], X[, 2], col = "blue", main = "Scatter plot",
+xlab = "First component (X)", ylab = "Second component (Y)")
+```
+
+### Template — Bivariate scatterplot (2D, Gaussian context)
+
+The scatter plot shows the realizations of the bivariate `[Gaussian / 
+empirical]` distribution in the Cartesian plane, with `[X_1]` on the 
+horizontal axis and `[X_2]` on the vertical axis.
+
+Most of the points are clustered around the mean `[(μ_X1, μ_X2)]`, with a 
+`[limited / substantial]` number of points that deviate from the central 
+part of the distribution. The range of variation is `[approximately the 
+same / different]` for the two components, indicating that the corresponding 
+variances are `[similar / different]`. 
+
+The points are arranged in a region of `[circular / elliptical]` shape, 
+`[without / with]` a `[well-defined / clear]` orientation `[along the "/" 
+direction / along the "\\" direction]`. This behaviour indicates that the 
+covariance is `[equal to zero / positive / negative]`.
+
+[Optional, if outliers or non-typical observations are present:]
+
+The plot also reveals the presence of `[describe: e.g., "a second, less 
+dense cloud of points characterized by high values of X_1" or "an isolated 
+point (outlier) showing the highest values for both X_1 and X_2"]`, which 
+will require attention in the subsequent analysis.
+Guarda l’orientamento della “nuvola”:
+
+inclinata verso l’alto → correlazione positiva
+inclinata verso il basso → correlazione negativa
+quasi circolare → correlazione circa zero
+
+Più la nuvola è “stretta” e allungata → correlazione forte.
+
+Più è “larga” e quasi circolare → correlazione debole.
+
 ### Densità teorica e plot 3D
  
 ```{r density-3d, eval=FALSE}
@@ -622,7 +743,15 @@ for (i in length(z2):1) {
                   type = "l", col = "darkorange")
 }
 ```
- 
+
+The scatter3d shows the bivariate normal density of **[VAR_X]** and 
+**[VAR_Y]** with μ = ([MU_X], [MU_Y]) and correlation ρ = [RHO]. The surface 
+peaks at the mean and decays smoothly in every direction. The elliptical 
+contours are [tilted positively / tilted negatively / axis-aligned], 
+indicating a [positive / negative / null] linear dependence between the two 
+variables, while the [VAR_X / VAR_Y] axis shows [greater / smaller] spread 
+due to σ_x [>/</≈] σ_y.
+
 ### Contour plot (ellissi di isodensità)
  
 ```{r contour, eval=FALSE}
@@ -647,6 +776,51 @@ contour(z1, z2, dens,
 | Ellisse inclinata "/" | $\rho > 0$ |
 | Ellisse inclinata "\\" | $\rho < 0$ |
 | Ellisse molto schiacciata | $|\rho|$ vicino a 1 |
+
+Inclinazione (segno di ρ)
+Guarda la direzione di massima estensione (cresta nel 3D, asse maggiore dell'ellisse nel contour):
+↗ da basso-sx ad alto-dx → ρ > 0
+↘ da alto-sx a basso-dx → ρ < 0
+∥ asse X o Y (orizzontale/verticale) → ρ ≈ 0
+Forma rotonda/cerchio/collina simmetrica → ρ ≈ 0 e σ_x ≈ σ_y
+
+Step 3 — Rapporto σ_x / σ_y
+Guarda la proiezione sugli assi (l'ombra dell'ellisse o della base della campana):
+
+Si estende di più lungo X → σ_x > σ_y
+Si estende di più lungo Y → σ_y > σ_x
+Proiezioni simili su entrambi → σ_x ≈ σ_y
+
+Step 4 — Solo per il 3D: altezza del picco
+
+Campana alta e stretta → varianze piccole e/o |ρ| grande → probabilità concentrata
+Campana bassa e larga → varianze grandi e/o ρ ≈ 0 → probabilità diffusa
+
+The contour plot displays the level sets of the bivariate normal density of 
+**[VAR_X]** and **[VAR_Y]**, with mean vector μ = ([MU_X], [MU_Y]) and 
+correlation ρ = [RHO]. Each curve connects points of equal density, providing 
+a 2D projection of the underlying 3D surface.
+
+The contours are **elliptical** and concentric around the mean ([MU_X], 
+[MU_Y]), which corresponds to the mode of the distribution. Their geometry 
+reflects the covariance structure:
+
+- **Orientation:** the ellipses are [tilted along the positive diagonal / 
+  tilted along the negative diagonal / aligned with the coordinate axes], 
+  consistent with a [positive / negative / negligible] correlation 
+  ρ = [RHO].
+- **Eccentricity:** the ellipses are [highly elongated / moderately 
+  elongated / nearly circular], indicating that the linear dependence between 
+  [VAR_X] and [VAR_Y] is [strong / moderate / weak]. As |ρ| → 1 the contours 
+  collapse onto a line; as ρ → 0 they become axis-aligned ellipses (or 
+  circles when σ_x = σ_y).
+- **Axis spread:** the ellipses extend [further along VAR_X / further along 
+  VAR_Y / similarly along both axes], reflecting σ_x [>/</≈] σ_y.
+
+The innermost contour identifies the region of highest probability mass, 
+while outer contours enclose increasingly larger probability regions (e.g. 
+the ellipse at level corresponding to χ²₂(0.95) contains approximately 95% 
+of the distribution).
  
 ### Decomposizione spettrale di $\Sigma$
  
@@ -748,25 +922,6 @@ ggpairs(df)
 # sopra diagonale: correlazioni con livelli di significatività
 ```
 
-### Standard template — bivariate scatterplot
-
-The scatterplot reports the joint distribution of [VAR_Y] and [VAR_X] for 
-the $n = [n]$ observations in the sample, with [VAR_X] on the horizontal 
-axis and [VAR_Y] on the vertical axis.
-
-The points show [a clear / a moderate / a weak / no apparent] linear 
-association between the two variables: as [VAR_X] increases, [VAR_Y] tends 
-to [increase / decrease / remain constant]. The relationship appears 
-approximately **[linear / non-linear]**, with [no evident curvature / a 
-slight curvature / a clearly non-linear pattern]. The strength of the 
-association can be described as **[strong / moderate / weak]**.
-
-The dispersion of the points around the underlying trend is [small / 
-moderate / large / increasing with VAR_X], suggesting [low / moderate / high] variability in the relationship.
-
-[Optional: one sentence on a specific feature if relevant — outlier, 
-heteroscedasticity, curvature, but only if it's worth mentioning.]
-
 
 ### Visualizzazione matrici di correlazione: corrplot
  
@@ -804,6 +959,121 @@ par(mfrow = c(1, 1))
 
 
 # Inferenza
+
+## Estimators properties
+
+An estimator $\hat\theta$ is a statistic, that is, a function of the sample 
+$(X_1, \dots, X_n)$, used to approximate an unknown parameter $\theta$ of 
+the population distribution. Since different estimators can be proposed for 
+the same parameter, it is essential to identify the properties that 
+distinguish a "good" estimator from a poor one. These properties are 
+usually divided into **finite-sample properties**, which hold for any 
+sample size $n$, and **asymptotic properties**, which hold in the limit as 
+$n \to \infty$.
+
+---
+
+**1. Unbiasedness.** An estimator $\hat\theta$ is said to be *unbiased* if 
+its expected value coincides with the true parameter:
+
+$$
+\mathbb{E}[\hat\theta] = \theta.
+$$
+
+The *bias* of the estimator is defined as 
+$\mathrm{Bias}(\hat\theta) = \mathbb{E}[\hat\theta] - \theta$, and 
+unbiasedness corresponds to $\mathrm{Bias}(\hat\theta) = 0$. This property 
+is important because it guarantees that, on average over repeated samples, 
+the estimator neither systematically overestimates nor underestimates the 
+parameter. A biased estimator can still be useful, but only if its bias is 
+small or vanishes asymptotically.
+
+**2. Efficiency (minimum variance).** Among all unbiased estimators of 
+$\theta$, the most desirable is the one with the smallest variance, since 
+a smaller variance means that the estimates are more concentrated around 
+the true value $\theta$ and therefore more reliable. An unbiased estimator 
+whose variance attains the **Cramér–Rao lower bound** 
+
+$$
+\mathrm{Var}(\hat\theta) \;\geq\; \frac{1}{I(\theta)},
+$$ 
+
+where $I(\theta)$ denotes the Fisher information, is called *efficient*. 
+Efficiency is crucial because it ensures that no other unbiased estimator 
+can exploit the information contained in the sample more effectively.
+
+**3. Mean Squared Error (MSE).** When comparing estimators that are not 
+both unbiased, the natural criterion is the *mean squared error*, which 
+combines bias and variance:
+
+$$
+\mathrm{MSE}(\hat\theta) 
+= \mathbb{E}\!\left[(\hat\theta - \theta)^2\right] 
+= \mathrm{Var}(\hat\theta) + \mathrm{Bias}(\hat\theta)^2.
+$$
+
+This decomposition highlights the well-known *bias–variance trade-off*: a 
+slightly biased estimator with a much smaller variance can outperform an 
+unbiased one with high variability. The MSE is therefore the most 
+comprehensive single measure of the quality of an estimator in finite 
+samples.
+
+**4. Consistency.** An estimator $\hat\theta_n$ is said to be *consistent* 
+if it converges in probability to the true value of the parameter as the 
+sample size grows:
+
+$$
+\hat\theta_n \;\xrightarrow{P}\; \theta 
+\qquad \text{as } n \to \infty.
+$$
+
+Consistency is a minimal requirement for any reasonable estimator: it 
+guarantees that, by collecting enough data, we can approximate the true 
+parameter with arbitrarily high accuracy. An inconsistent estimator is 
+generally regarded as unacceptable, since increasing the sample size would 
+not improve it.
+
+**5. Asymptotic unbiasedness.** A weaker condition than unbiasedness is 
+*asymptotic unbiasedness*, which requires that 
+$\mathbb{E}[\hat\theta_n] \to \theta$ as $n \to \infty$. Many estimators 
+(including the maximum likelihood estimator in general) are biased for 
+finite $n$ but become unbiased in the limit. This property is important 
+because it ensures that the bias becomes negligible for sufficiently large 
+samples.
+
+**6. Asymptotic normality.** An estimator is *asymptotically normal* if 
+its standardized version converges in distribution to a Gaussian:
+
+$$
+\sqrt{n}\,(\hat\theta_n - \theta) 
+\;\xrightarrow{d}\; \mathcal{N}\!\left(0,\; V(\theta)\right),
+$$
+
+so that for large $n$ we can approximate 
+$\hat\theta_n \approx \mathcal{N}(\theta, V(\theta)/n)$. This property is 
+fundamental in practice because it provides the theoretical basis for 
+constructing **confidence intervals** and performing **hypothesis tests** 
+(typically of Wald type) without knowing the exact finite-sample 
+distribution of the estimator.
+
+**7. Asymptotic efficiency.** An estimator is *asymptotically efficient* 
+if, among all consistent and asymptotically normal estimators, it attains 
+the smallest possible asymptotic variance, namely the Cramér–Rao lower 
+bound $1/I(\theta)$. This is the asymptotic counterpart of efficiency and 
+is one of the main reasons why maximum likelihood estimators are so 
+widely used: under standard regularity conditions they are consistent, 
+asymptotically unbiased, asymptotically normal and asymptotically 
+efficient.
+
+**8. Sufficiency.** An estimator (or, more generally, a statistic) is 
+said to be *sufficient* for $\theta$ if it contains all the information 
+about $\theta$ that is present in the sample, in the sense that the 
+conditional distribution of the data given the sufficient statistic does 
+not depend on $\theta$. Sufficiency is important because it implies that 
+no information is lost by summarizing the sample through the statistic, 
+and by the Rao–Blackwell theorem any unbiased estimator can be improved 
+(in terms of variance) by conditioning on a sufficient statistic.
+
 
 ## Maximum Likelihood Estimation
 
