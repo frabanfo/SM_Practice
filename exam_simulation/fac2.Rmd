@@ -34,8 +34,77 @@ Data available in water.Rdata11 report concentrations of organic substances in s
 tank storing the water: 0 if plastic, 1 if steel Flow: water flow rate (in liters per minute); Temperature: external temperature (in degrees Celsius).
 
 ```{r}
-water = load('data/water.Rdata')
+head(water)
 ```
 
+### 1 Report the sample size and specify if data are derived from an observational study. Summarize the data by the categorical variable and comment on the reported results
+
+```{r}
+nrow(water[water$Material==0,])
+nrow(water[water$Material==1,])
+
+nrow(water)
+```
+
+```{r}
+by(water[, c("Organic", "Flow", "Temperature")], water$Material, skim_without_charts)
+```
+The sample is composed by 388 units, with 323 units where made up of plastic material and 65 of steel.
+Comparing the two groups, we can see that the mean of organic in group where the material is plastic is 5.664 versus 7.035 in group 1, we can say that in average there is more organic concentration of substances in steel tanks. Regarding the distributions, we can see that the mean and median are pretty close in both cases, suggesting an approximate symmetrical distribution around the center. 
+
+Regarding the flow variable, we can see that there is a quite big variability in the data: with a standard deviation of 18.634 in the group of plastic material, and 20.272 in the group of steel material. Moreover, we can see that in both cases the median is quite lower than the mean, this suggest a right-skewned distribution, confirmed by the fact that there are some cases where the flow rate is much higher than the median value (max0 = 96 and max1=73). 
+
+Regarding the temperature, we can see that on average the external temperature in the cases of plastic tanks is 13.255 while in the case of steel tanks is 18.172031, higher by around 5 units, and presents also an higher variability, represented by the standard deviation 7.856 vs 5.546721.
 
 
+### 2 Estimate a multiple linear regression model to explain the concentration of organic substances (Organic) as a function of all the other explanatory variables. Print the results using the summary function and comment on the residuals, the estimated regression coefficients and their standard errors and significance
+
+```{r}
+mod_full <- lm(Organic ~ ., data = water)
+summary(mod_full)
+```
+The estimated model is:
+
+$\hat{Y} = 4.058621 + 0.729081 \cdot \text{Material1} +  0.023623 \cdot \text{Flow} + 0.094274 \cdot \text{Temperature}$
+
+**Residual analysis**
+
+The residuals range from $-1.56490$ to $3.14652$ with median $0.04958$, very close to 0, as expected for a well-specified model. The IQR is $[-0.66373, 0.53189]$ approximately centered on 0. However, the maximum 
+residual ($3.147$) is substantially larger in absolute value than the minimum ($-1.565$), suggesting a **slight positive asymmetry in the tails**: the model appears to underestimate the probability of `Organic` for one or more units in the sample more than it overestimates it A formal assessment of the model assumptions will be performed in the diagnostic plots section.
+
+**Coefficient interpretation**
+
+- **Material1** ($\hat{\beta}_1 = 0.729081$): significant at the 99.999% level (p-value $2.61e-09$). This means that in the case of the steel tanks we have an average increase of $0.729081$ units in $organic$ with respect to plastic tanks.
+
+- **Flow** ($\hat{\beta}_2 = 0.023623$):  significant at the 0.001% level (p-value < $2.61e-09$). A unit increase is associated with an average increase of $0.023623$ units in $organic$, since the flow is usually a large number, this is very significative.
+
+- **Temperature** ($\hat{\beta}_3 = 0.094274$):  significant at the 0.001% level (p-value < $2.61e-09$). A unit increase is associated with an average increase of $0.094274 $ units in $organic$ concentration.
+
+### 3 Depict the two scatterplots of the residuals with respect to the continuous covariates. Comment on the plots.
+
+```{r}
+res <- residuals(mod_full)        # deviance residuals (default for glm)
+
+par(mfrow = c(1, 2))
+
+plot(water$Flow, res,
+     main = "Residuals vs Flow",
+     xlab = "Flow",
+     ylab = "Deviance residuals",
+     pch = 16, col = "blue")
+abline(h = 0, lty = 2, col = "gray")
+
+plot(water$Temperature, res,
+     main = "Residuals vs Temp",
+     xlab = "Temp",
+     ylab = "Deviance residuals",
+     pch = 16, col = "blue")
+abline(h = 0, lty = 2, col = "gray")
+
+par(mfrow = c(1, 1))
+```
+
+**Residuals vs `flow`**: The residuals are scattered randomly , with no apparent trend 
+across the range of the Flow variable`. The dispersion appears  to decrease with the flow covariate, also due to the fact that we have more observations with low flow value.
+
+**Residuals vs `Temp`**: The residuals against Temp show a similar random pattern. Regarding the dispersion, it appears  to remain almost constant within the range of the Temp covariate.

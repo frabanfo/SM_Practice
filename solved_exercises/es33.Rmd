@@ -1,0 +1,37 @@
+---
+title: "ex33"
+author: "me"
+date: "2026-05-13"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 6,
+  fig.height = 4,
+  fig.align = "center"
+)
+```
+
+```{r libraries, eval=FALSE}
+# Caricamento librerie usate nel corso
+library(MASS)       # stepAIC, Boston dataset
+library(car)        # vif, diagnostica
+library(corrplot)   # visualizzazione matrici di correlazione
+library(boot)       # bootstrap
+library(ppcor)      # correlazioni parziali
+library(GGally) 
+library(mvtnorm)
+library(ggplot2)
+library(skimr)
+library(gridExtra)
+
+```
+
+```{r}
+load('')
+```
+

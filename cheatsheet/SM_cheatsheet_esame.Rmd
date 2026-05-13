@@ -88,6 +88,29 @@ require(skimr)
 skim_without_charts(data.frame(x = x))
 ```
 
+
+```{r}
+boxplot(df)
+plot(density(df))
+```
+
+The boxplot of `[variable]` shows a median of approximately `[median]`, 
+with the central 50% of the observations concentrated between `[Q1]` and 
+`[Q3]` (IQR = `[IQR]`). The box appears `[symmetric / asymmetric]`, with 
+the median `[centered / shifted toward Q1 / shifted toward Q3]`.
+
+The whiskers extend from `[lower whisker]` to `[upper whisker]`. `[N]` 
+observations fall outside the whiskers and are flagged as potential outliers 
+(points above `[upper whisker]` or below `[lower whisker]`). `[Brief 
+interpretation: e.g., "these correspond to unusually large/small values 
+of [variable]"]`.
+
+
+The density plot of `[variable]` shows a `[unimodal/bimodal]`, 
+`[symmetric/right-skewed/left-skewed]` distribution with mode around 
+`[value]`. The shape is `[consistent with / suggests deviation from]` 
+a normal distribution, which can be further verified via a Q-Q plot.
+
 #### Case 2 — Two continuous variables (e.g., Es. 12 two servers)
 
 ```{r desc-two-vec, eval=FALSE}
@@ -233,6 +256,8 @@ extreme observation that warrants further investigation"].
 variability than `[group_B]`. Specifically, the mean of [variable] is [mean_A] 
 in group A versus [mean_B] in group B, and the standard deviation is [SD_A] vs 
 [SD_B].
+
+range/iqr: 3-5 compatible 5-7 possbile heavy tails >7-8 deviation from normality/heavy outlier >>10 distribuzione dispersa o heavy tailed
 
 ---
 
