@@ -175,7 +175,7 @@ tapply(df$var1, df$group, summary)
 
 #### Block B — Spread / variability
 
-- **Standard deviation**: typical deviation from the mean. Same units as the 
+- **Standard deviation**: typical deviation from the mean. Same units as the
   variable.
 - **Interquartile range (IQR)**: spread of the central 50% of the data, 
   robust to outliers.
@@ -1287,7 +1287,7 @@ It is worth noting that $[1-\alpha]\%$ is not the probability that the point
 estimate falls within the interval. Rather, we are confident at the 
 $[1-\alpha]\%$ level that the true parameter falls within this range. The 
 [narrow / wide] width of the interval reflects [a good / a limited] precision 
-in estimating the parameter.
+in estimating the parameter. No strong asymmetry or multimodality is observed in the bootstrap distribution, supporting the stability of the estimator.
 
 ### Template — bootstrap of a discrete statistic (e.g., median on small sample)
 

@@ -108,3 +108,128 @@ par(mfrow = c(1, 1))
 across the range of the Flow variable`. The dispersion appears  to decrease with the flow covariate, also due to the fact that we have more observations with low flow value.
 
 **Residuals vs `Temp`**: The residuals against Temp show a similar random pattern. Regarding the dispersion, it appears  to remain almost constant within the range of the Temp covariate.
+
+
+
+## Es 2
+
+Consider the data in rivers.Rdata2 recording the lengths (in miles) of the 141
+major rivers in North America (as compiled by the US Geological Survey).
+
+### .1 Illustrate the data using the appropriate descriptive statistics. Depict the scatter plot and comment according to the applicative context.
+
+```{r}
+load("data/rivers.Rdata")
+head(rivers)
+```
+```{r}
+skimr::skim_without_charts(rivers)
+IQR(rivers)
+```
+
+The data set contains 141 observations regarding river lengths, it does not present missing values with a 100% compete rate.
+The descriptive statistics for the lenghts are as follows. The mean is 
+591.184 and the median is 425: their difference suggests 
+that the distribution is quite asymmetric around the central value. In fact, we can say that the distribution is right-skewned, with heavier tails on the higher side, as there are some high values that inflate the mean (ex: maximum value = 3710 miles)
+
+Regarding variability, the standard deviation is 493.87, indicating that the 
+observations deviate on average by approximately 493.87 units from the mean, which is a high value and suggest a big variability in the data. 
+The interquartile range is 370, with one-quarter of the observations below 
+310 and another quarter above 680. The total range is from 135 to 3710, 
+approximately 9.662 times the IQR, suggesting that there are extreme values in the tails.
+
+```{r}
+plot(rivers, main = "River length distribution")
+```
+The scatter plot shows that most observations are concentrated between 130 and 680 miles, with few observations over that value that lead to the heavy tail that we have discussed. It confirmed that the distribution appears slightly right-skewed, as a few larger values are present. No strong clustering structure is evident, although there are some isolated observations that may be considered potential outliers. 
+
+### .2 Consider the coefficient of variation (defined as σ/µ) as a parameter of interest. Provide an estimate of its standard error applying nonparametric bootstrap. Comment on the procedure and report the estimated value.
+
+```{r}
+library(bootstrap)
+
+set.seed(7369)
+n <- length(rivers) 
+
+# funzione ausiliaria: prende indici, restituisce la statistica
+aux_fun <- function(ind) {
+  sd(rivers[ind])/(mean(rivers[ind]))                      
+}
+
+result_boot <- bootstrap::bootstrap(x = 1:n,
+                                    nboot = 1000,
+                                    theta = aux_fun)
+
+# accesso alle B stime bootstrap
+theta_boot <- result_boot$thetastar
+summary(theta_boot)
+
+theta_orig = sd(rivers)/mean(rivers)
+sd(theta_boot)
+```
+via the nonparametric bootstrap with $B = 1000$ replications. This procedure 
+allows estimation of the standard error and the construction of confidence 
+intervals without relying on distributional assumptions, which is particularly The accuracy of the estimator $\hat\theta = (\frac{sigma}{mu})$.
+
+The $B = 1000$ bootstrap estimates of $\hat\theta$ range from 0.537 to 1.074, 
+with mean 0.8177 and median 0.8177. Both the mean and median 
+of the bootstrap distribution are very close to the original sample estimate 
+$\hat\theta = 0.835$, in agreement with the general property that the 
+bootstrap distribution is centered (in expectation) on the original sample 
+estimate.
+
+The bootstrap standard error is computed as the standard deviation of the $1000$ bootstrap estimates: $\widehat{SE}_{\text{boot}} =  0.0928$. This represents approximately 11,114% of the magnitude of the original 
+estimate, suggesting a high level of precision. 
+The variability of the bootstrap distribution is also influenced by the presence of few outlier values, which is included in different 
+proportions in the various resamples and amplifies the spread of $\hat\theta^*$.
+
+
+### .3 Provide a bootstrap confidence interval for the parameter at 99%. Depict the histogram of the bootstrap distribution adding the bars referring to the upper and lower bounds of the confidence interval and the mean of the bootstrap replicates along with the value of the estimate on the original sample. Add the legend and comment.
+
+```{r}
+ci_99 <- quantile(theta_boot, probs = c(0.005, 0.995))
+round(ci_99, 3)
+```
+```{r}
+hist(theta_boot,
+     breaks = 40,
+     freq = FALSE,                           # densità invece di frequenze
+     col = "lightgray", border = "white",
+     main = "Bootstrap distribution",
+     xlab = "Stima bootstrap",
+     ylab = "Densità")
+
+# linea verticale alla stima originale
+abline(v = theta_orig, col = "red", lwd = 2, lty = 1)
+
+# linea verticale alla media delle B stime bootstrap
+abline(v = mean(theta_boot), col = "blue", lwd = 2, lty = 2)
+
+# se hai calcolato il CI: linee tratteggiate ai bound
+ci <- quantile(theta_boot, c(0.025, 0.975))
+abline(v = ci, col = "green", lwd = 2, lty = 2)
+
+legend("topright",
+       legend = c("Stima originale", "Media bootstrap", "CI bounds"),
+       col = c("red", "blue", "green"),
+       lty = c(1, 2, 2), lwd = 2,
+       cex = 0.7)
+```
+
+The histogram of the bootstrap distribution is reported below, with vertical lines indicating the original sample estimate ($[theta orig]$, in red), the mean of the $1000$ bootstrap estimates ($[meanboot]$, in blue), and the lower and upper bounds of the $99$% percentile confidence interval ($0.589$ and $1.031$, in green, dashed).
+
+The shape of the distribution is approximately symmetric and bell-shaped, with the original estimate falling near the center of the bootstrap distribution. 
+The confidence interval [$0.589$, $1.031$] covers approximately the central $99$% of the bootstrap mass and represents a range of values centered around the point estimate of the parameter.
+
+It is worth noting that $99%$ is not the probability that the point 
+estimate falls within the interval. Rather, we are confident at the 
+$99%$ level that the true parameter falls within this range. The bootstrap distribution appears reasonably concentrated around the point estimate, suggesting a fairly precise estimator. In particular, the moderate width of the confidence interval indicates limited sampling variability and therefore a relatively good level of estimation accuracy. No strong asymmetry or multimodality is observed in the bootstrap distribution, supporting the stability of the estimator.
+
+
+### .4 Illustrate the assumptions under the classical multiple linear regression model.
+
+1. **Linearity**: response is a linear and additive function of covariates
+2. **Zero-mean errors**: $\mathbb{E}[\epsilon_i] = 0$
+3. **Homoscedasticity**: $\text{Var}(\epsilon_i) = \sigma^2$ constant for all $i$
+4. **Independence**: $\text{Cov}(\epsilon_i, \epsilon_j) = 0$ for $i \neq j$
+5. **Normality** (needed for t-test, F-test, CI): $\epsilon_i \sim \mathcal{N}(0, \sigma^2)$
