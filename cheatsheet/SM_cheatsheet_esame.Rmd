@@ -2733,7 +2733,7 @@ I modelli sono codificati con **3 lettere** (volume, forma, orientazione):
 library(mclust)
 
 # selezione automatica di K e modello basata su BIC
-mod_clust <- Mclust(df, G = 1:9)
+mod_clust <- Mclust(df, G = 1:9,, modelNames = "e/v")
 
 # output principali
 summary(mod_clust)              # info sintetica: modello, K, log-lik, BIC
@@ -2765,6 +2765,53 @@ Clustering table:
 - **BIC**: criterio di selezione (in mclust **più alto è meglio** — convenzione opposta al solito)
 - **ICL**: Integrated Completed Likelihood (penalizza l'overlap tra cluster)
 - **Clustering table**: quante unità in ogni cluster
+
+### Comment template — mclust summary
+
+The summary of the model reports the value of the **log-likelihood at 
+convergence** (equal to `[log-lik value]`), the **BIC** and **ICL** indices 
+(`[BIC value]` and `[ICL value]`), the **number of observations** (`[n]`) 
+and the **degrees of freedom** — computed as the number of free parameters 
+estimated by the model (`[df]`).
+
+The output also provides the **number of observations classified in each 
+cluster** by the MAP rule. We observe that `[cluster A]` is `[larger / 
+smaller / similarly sized]` than `[cluster B]`, with `[n_A]` subjects 
+compared to `[n_B]`.
+
+[Optional, one closing sentence if relevant:]
+
+The selected model is **`[model code, e.g., VVV / EEE]`** with **`[K]` 
+components**, indicating that the data are best described by clusters with 
+`[describe geometric structure: e.g., "varying volume, shape and orientation" 
+/ "equal volume, shape and orientation"]`.
+
+### Parameters = TRUE 
+The parameters of the estimated mixture model are:
+
+**(i)** the **mixing probabilities (weights)** of the `[K]` mixture components,
+**(ii)** the **means** of the components,  
+**(iii)** the **variances** (or covariance matrices, in the multivariate case).
+
+**Mixing weights**: The `[K]` components have weights of `[π_1, π_2, ...]`, 
+respectively. Note that these values represent the **estimated proportions 
+of the population** belonging to each component — they do not necessarily 
+coincide with the empirical proportions of subjects allocated to each group 
+by the MAP rule.
+
+**Means**: The mean value of `[variable name]` for subjects in component 1 
+is `[μ_1]`, `[much lower / similar / higher]` than the corresponding value 
+for component 2 (`[μ_2]`). We can therefore characterize the `[K]` 
+subpopulations based on the value of `[variable]`: `[describe direction: 
+higher / lower]` values on average for `[component A]`, `[higher / lower]` 
+for `[component B]`.
+
+**Variances**: The variance values for the components are `[equal / 
+different]`, consistent with the model code `[model_code, e.g., EEE, VVV]` 
+selected. The corresponding standard deviation is approximately `[σ]`; 
+this value represents the average variability around the mean of each 
+component.
+
 
 ---
 
@@ -2832,6 +2879,7 @@ Se due modelli hanno BIC simile ma ICL molto diverso, significa che uno ha clust
 ## Trappole comuni (clustering)
 
 - **Standardizzare le variabili prima** del clustering se hanno scale molto diverse — altrimenti la variabile con il range maggiore domina la struttura di $\Sigma$
+
   ```{r scale-before-mclust, eval=FALSE}
   df_std <- scale(df)
   mod <- Mclust(df_std)
@@ -2841,6 +2889,221 @@ Se due modelli hanno BIC simile ma ICL molto diverso, significa che uno ha clust
 - **Non pre-specificare K rigidamente**: usare `Mclust(df, G = 1:9)` per esplorare
 - **VVV può overfittare con pochi dati**: con poche osservazioni per cluster, preferire EEE o EEI per evitare stime di varianza instabili
 - **Variabili categoriali**: `mclust` è progettato per variabili continue. Per dati misti usare solo le continue, o valutare approcci alternativi
+
+---
+
+### Step 5 — Classification of each individual (Es. 32 point .5, Es. 33 point .4)
+
+```{r mclust-classification, eval=FALSE}
+# classification by MAP rule
+mod_clust$classification
+table(mod_clust$classification)
+prop.table(table(mod_clust$classification))
+
+# posterior probabilities of cluster membership (n x K)
+head(mod_clust$z)
+
+round(head(cbind(mod_clust$z, Cluster = mod_clust$classification)), 4)
+
+```
+
+**Comment template — classification:**
+
+The classification of each individual is obtained by applying the **MAP rule 
+(Maximum A Posteriori)**: each unit is assigned to the cluster with the 
+highest estimated posterior probability of membership. Specifically:
+
+$$
+\hat z_i = \arg\max_{k = 1, \dots, K} \hat p_{ik}
+$$
+
+where $\hat p_{ik}$ is the estimated posterior probability that unit $i$ 
+belongs to cluster $k$, computed via Bayes' rule using the estimated 
+mixing weights and component densities.
+
+The resulting classification produces `[K]` groups with sizes `[n_1, n_2, ...]` 
+(empirical proportions: `[p_1, p_2, ...]`). These empirical proportions are 
+`[close to / different from]` the estimated mixing weights `[π_1, π_2, ...]`, 
+as expected: the mixing weights estimate the **population-level** 
+proportions, while the empirical proportions reflect the **sample-level** 
+classification.
+
+**Applicative interpretation**: 
+
+For the application at hand, this classification allows us to `[describe: 
+"distinguish between two latent subpopulations of patients based on their 
+haemoglobin levels, potentially corresponding to clinical categories such 
+as anaemic vs healthy individuals" / "group fishes into age classes based 
+on length, useful for fishery management without requiring direct age 
+measurements"]`. The model thus provides a data-driven, unsupervised 
+classification of subjects without needing pre-existing labels.
+
+---
+
+### Step 6 — Visualizing the clustering partition (Es. 32 point .6, Es. 33 point .5)
+
+#### Univariate case (most common in Es. 32-33)
+
+```{r mclust-class-plot-univariate, eval=FALSE}
+# main multi-plot
+plot(mod_clust, what = "classification")
+
+# customized stripchart-style univariate visualization
+stripchart(haemoglobin ~ mod_clust$classification,
+           method = "jitter", pch = 16,
+           col = c("salmon", "steelblue"),
+           main = "Cluster partition",
+           xlab = "Haemoglobin")
+legend("topright",
+       legend = c("Cluster 1", "Cluster 2"),
+       col = c("salmon", "steelblue"),
+       pch = 16, cex = 0.8)
+```
+
+#### Multivariate case (occasional, for completeness)
+
+```{r mclust-class-plot-multivariate, eval=FALSE}
+# pairwise scatterplots colored by cluster
+plot(mod_clust, what = "classification")
+```
+
+**Comment template — classification plot:**
+
+The plot shows the partition of the sample into `[K]` clusters, with each 
+unit colored according to its MAP assignment. The clusters are 
+`[clearly separated / partially overlapping / heavily overlapping]` along 
+the `[variable]` axis: cluster 1 is concentrated in the range `[range_1]`, 
+while cluster 2 occupies the range `[range_2]`. The boundary between 
+clusters lies around `[boundary value]`, which corresponds to the value at 
+which the posterior probabilities of the two components are approximately 
+equal.
+
+[Optional, for Es. 33 with K=4]:
+
+For the snapper dataset with 4 components, the clusters partition the length 
+distribution into four groups, plausibly corresponding to four different age 
+classes. The mean lengths increase monotonically across clusters, consistent 
+with progressive fish growth: cluster 1 (mean = `[μ_1]`) likely represents 
+the youngest fish, while cluster 4 (mean = `[μ_4]`) represents the oldest. 
+The clusters with intermediate means (`[clusters 2 and 3]`) show 
+`[some / substantial]` overlap, reflecting the natural continuity of growth.
+
+---
+
+### Step 7 — Mixture density + histogram (Es. 32 point .7, Es. 33 point .6)
+
+This is one of the most distinctive plots of mixture analysis: shows visually 
+how well the mixture density fits the observed data.
+
+```{r mclust-density-plot, eval=FALSE}
+# grid of values over the range of the data
+x_grid <- seq(min(haemoglobin), max(haemoglobin), length.out = 500)
+
+# extract estimated parameters
+pi_hat    <- mod_clust$parameters$pro
+mu_hat    <- mod_clust$parameters$mean
+sigma_hat <- sqrt(mod_clust$parameters$variance$sigmasq)  # for univariate
+
+# evaluate the mixture density on the grid
+mixture_density <- numeric(length(x_grid))
+for (k in 1:length(pi_hat)) {
+  mixture_density <- mixture_density + 
+                     pi_hat[k] * dnorm(x_grid, mean = mu_hat[k], sd = sigma_hat[k])
+}
+
+# plot histogram with overlaid mixture density
+hist(haemoglobin,
+     freq = FALSE,                       # density scale, not frequencies
+     breaks = 20,
+     col = "lightgray", border = "white",
+     main = "Histogram and estimated mixture density",
+     xlab = "Haemoglobin", ylab = "Density")
+lines(x_grid, mixture_density,
+      col = "red", lwd = 2)
+
+# also plot individual component densities
+for (k in 1:length(pi_hat)) {
+  lines(x_grid, 
+        pi_hat[k] * dnorm(x_grid, mean = mu_hat[k], sd = sigma_hat[k]),
+        col = "blue", lty = 2, lwd = 1.5)
+}
+legend("topright",
+       legend = c("Mixture density", "Component densities"),
+       col = c("red", "blue"),
+       lty = c(1, 2), lwd = 2, cex = 0.7)
+```
+
+**Comment template — mixture density + histogram:**
+
+The figure shows the histogram of the observed values of `[variable]` 
+together with the estimated mixture density (solid line) and the individual 
+component densities (dashed lines), weighted by their respective mixing 
+probabilities.
+
+The mixture density `[fits the histogram closely / shows a good agreement 
+with the observed distribution / shows some discrepancy in certain regions]`. 
+In particular, the `[bimodal / multimodal]` shape of the histogram is 
+captured by the mixture: each peak in the histogram corresponds to one of 
+the `[K]` component densities, suggesting that the observed heterogeneity 
+is well explained by `[K]` distinct subpopulations.
+
+The individual component densities reveal the structure underlying the 
+mixture: component 1 (centered at `[μ_1]`) captures the `[describe: e.g., 
+"left peak of the distribution"]`, while component 2 (centered at `[μ_2]`) 
+captures the `[describe]`. The valleys between peaks correspond to regions 
+of low density in the data, where membership in one of the two clusters is 
+uncertain.
+
+This visual confirmation supports the choice of `[K]` components: a 
+unimodal model (e.g., single Gaussian) would fail to capture the observed 
+multimodality, while a model with more components would likely overfit.
+
+---
+
+### Step 8 — Prediction for new units (Es. 33 point .7 only)
+
+```{r mclust-predict, eval=FALSE}
+# new fish with length = 7
+new_data <- data.frame(snapper = 7)
+
+# predict using the predict.Mclust method
+pred <- predict(mod_clust, newdata = new_data)
+
+# returns:
+# - classification: assigned cluster
+# - z: posterior probabilities of membership in each cluster
+pred$classification
+pred$z
+```
+
+**Comment template — prediction for a new unit:**
+
+For a new fish with length equal to `[value]` inches, the model assigns it 
+to cluster `[N]` based on the MAP rule, with the highest estimated posterior 
+probability `[max p]`. The complete vector of posterior probabilities is:
+
+| Cluster | Posterior probability |
+|---------|----------------------|
+| 1 | `[p_1]` |
+| 2 | `[p_2]` |
+| 3 | `[p_3]` |
+| 4 | `[p_4]` |
+
+The uncertainty of this prediction is $1 - \max_k \hat p_k = `[uncertainty]`$. 
+A `[low / high]` uncertainty indicates that the new unit is `[clearly / 
+ambiguously]` assigned to its cluster, lying `[centrally within / near the 
+boundary of]` the cluster's region.
+
+(uncertanty: <0.05 very low - 0.10 low - 0-20 medium > 0.3 high)
+
+**Applicative interpretation**: 
+
+A snapper of length 7 inches is most likely a `[young / adult / intermediate]` 
+fish, consistent with the age class represented by cluster `[N]`. This kind 
+of prediction is useful for fishery management: given only length 
+measurements (which are easy and inexpensive to collect), the model 
+provides a probabilistic estimate of the age class, which would otherwise 
+require destructive sampling (e.g., otolith analysis).
 
 ---
 

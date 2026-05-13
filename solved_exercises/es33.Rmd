@@ -31,7 +31,182 @@ library(gridExtra)
 
 ```
 
+Fish length measurements (in hiches) of 256 snappers (described in Cassie, 1954) are available in the file snapper.Rdata. The heterogeneity present in the data may be due to the fact that fishes belong to different age groups but age is not reported in the data
+
 ```{r}
-load('')
+load('Snapper.Rdata')
+head(snapper)
 ```
 
+### 1 Describe the data using descriptive statistics and graphics.
+
+```{r}
+skimr::skim_without_charts(snapper)
+IQR(snapper)
+```
+
+The descriptive statistics for snappers length are as follows. 
+The data set is composed of 256 observations and does not present missing values,.. The mean is 6.225 and the median is 5.85: since the values are pretty close, we can not assess a strong skewness in the data. However, this suggest a possible slight right skewness, with the presence of high values that inflate the mean, as we can see from the max value (12.8)
+
+Regarding variability, the standard deviation is 1.895, indicating that the 
+observations deviate on average by approximately 1.895 units from the mean. 
+The interquartile range is 2.425, with one-quarter of the observations below 
+5 inches and another quarter above 7.425. The total range is from 2.9 to 12.8,
+approximately 4,082 times the IQR, consistent with a normal-like distribution.
+```{r}
+boxplot(snapper)
+```
+```{r}
+plot(density(snapper))
+```
+The boxplot of the lenghts appears as predicted slightly asymmetric, with 
+the median shifted toward Q1.
+
+4 observations fall outside the whiskers and are flagged as potential outliers 
+(points above the upper whisker):these correspond to unusually large values of the lenght.
+The shape is consistent witha normal distribution, which can be further verified via a Q-Q plot.
+
+
+### 2 Using the ‘mclust‘ package estimate a mixture model with 4 components and varying variance among the components (model label as V). Comment on the values provided by the ‘summary‘ function.
+
+```{r}
+library(mclust)
+
+mod_clust <- Mclust(snapper, G = 4, modelNames = "V")
+
+# output principali
+summary(mod_clust) 
+```
+
+The summary of the model reports the value of the **log-likelihood at 
+convergence** (equal to -489.2821), the **BIC** and **ICL** indices 
+(-1039.561 and -1097.973), the **number of observations** (256), equal to the original samples, and the **degrees of freedom** — computed as the number of free parameters estimated by the model (11).
+
+The output also provides the **number of observations classified in each 
+cluster by the MAP rule. Cluster sizes are: cluster 1 — 26 units, cluster 2 — 143 units, cluster 3 - 56 units and cluster 4 with 31 units. We observe that the cluster B is by far the bigger one out of the other, contaning around half of the total observations.
+
+
+### 3 Comment on the estimated parameters referred to each subpopulation with reference to the data context.
+
+```{r}
+summary(mod_clust, parameters = TRUE)
+```
+
+The parameters of the estimated mixture model are:
+
+**(i)** the **mixing probabilities (weights)** of the 4 mixture components,
+**(ii)** the **means** of the components,  
+**(iii)** the **variances** (or covariance matrices, in the multivariate case).
+
+**Mixing weights**: The 4 components have weights of `0.09826312 0.54260677 0.17739121 0.18173891 `, respectively. Note that these values represent the **estimated proportions of the population** belonging to each component — they do not necessarily coincide with the empirical proportions of subjects allocated to each group by the MAP rule.
+
+**Means**: The mean value of the length for subjects in component 4
+is `8.902064 `, higher than the corresponding value for the other populations. We can therefore characterize the 4 sub-populations based on the value of their lengths.
+
+**Variances**: The variance values for the components are different, consistent with the model code V selected.
+
+### 4 Provide a classification of each fish. What we can learn from these results for the applicative problem at hand?
+
+```{r}
+round(cbind(mod_clust$z, Cluster = mod_clust$classification), 4)
+```
+The classification of each individual is obtained by applying the **MAP rule 
+(Maximum A Posteriori)**: each unit is assigned to the cluster with the 
+highest estimated posterior probability of membership. Specifically:
+
+$$
+\hat z_i = \arg\max_{k = 1, \dots, K} \hat p_{ik}
+$$
+
+where $\hat p_{ik}$ is the estimated posterior probability that unit $i$ 
+belongs to cluster $k$, computed via Bayes' rule using the estimated 
+mixing weights and component densities.
+
+Regarding the applicative problem this method croup could be useful to group fishes into age classes based on length, useful for fishery management without requiring direct age measurements. The model thus provides a data-driven, unsupervised classification of subjects without needing pre-existing labels.
+
+```{r}
+# main multi-plot
+plot(mod_clust, what = "classification")
+
+# customized stripchart-style univariate visualization
+stripchart(snapper ~ mod_clust$classification,
+           method = "jitter", pch = 16,
+           col = c("salmon", "steelblue", "yellow", "orange"),
+           main = "Cluster partition",
+           xlab = "Length")
+legend("topright",
+       legend = c("Cluster 1", "Cluster 2", "Cluster 3", "Cluster 4"),
+       col = c("salmon", "steelblue", "yellow", "orange"),
+       pch = 16, cex = 0.8)
+```
+The plot shows the partition of the sample into the 4 clusters, with each 
+unit colored according to its MAP assignment. The clusters are 
+clearly separated along the X (length) axis: cluster 1 is concentrated in the range `[2, 4]`, cluster 2 occupies the range `[4,7]`, cluster 3 [7,8] while cluster 4 has the biggest variability with a range of around [8, 12].
+
+### 6 Plot the estimated mixture density along with the histogram of the observed data. Comment on the figure.
+
+```{r}
+# grid of values over the range of the data
+x_grid <- seq(min(snapper), max(snapper), length.out = 500)
+
+# extract estimated parameters
+pi_hat    <- mod_clust$parameters$pro
+mu_hat    <- mod_clust$parameters$mean
+sigma_hat <- sqrt(mod_clust$parameters$variance$sigmasq)  # for univariate
+
+# evaluate the mixture density on the grid
+mixture_density <- numeric(length(x_grid))
+for (k in 1:length(pi_hat)) {
+  mixture_density <- mixture_density + 
+                     pi_hat[k] * dnorm(x_grid, mean = mu_hat[k], sd = sigma_hat[k])
+}
+
+# plot histogram with overlaid mixture density
+hist(snapper,
+     freq = FALSE,                       # density scale, not frequencies
+     breaks = 20,
+     col = "lightgray", border = "white",
+     main = "Histogram and estimated mixture density",
+     xlab = "Length", ylab = "Density")
+lines(x_grid, mixture_density,
+      col = "red", lwd = 2)
+```
+
+The figure shows the histogram of the observed values of `length` 
+together with the estimated mixture density (solid line).
+
+The mixture density shows a good agreement with the observed distribution. 
+In particular, the multimodal shape of the histogram is captured by the mixture: each peak in the histogram corresponds to one of the 4 component densities, suggesting that the observed heterogeneity is well explained by 4 distinct subpopulations. We can see also that the 4th cluster does not have a real peak in density, but its shape is on the flatter and longer side: this is due to the previously seen bigger variability of values that are included on the group.
+
+
+### 7 Predict the classification for new fish (out of sample) having length equal to 7. Comment on the results.
+
+
+```{r}
+# new fish with length = 7
+new_data <- data.frame(snapper = 7)
+
+# predict using the predict.Mclust method
+pred <- predict(mod_clust, newdata = new_data)
+
+# returns:
+# - classification: assigned cluster
+# - z: posterior probabilities of membership in each cluster
+pred$classification
+pred$z
+```
+For a new fish with length equal to 7 inches, the model assigns it 
+to cluster 3 based on the MAP rule, with the highest estimated posterior 
+probability. The complete vector of posterior probabilities is:
+
+| Cluster | Posterior probability |
+|---------|----------------------|
+| 1 | 9.824306e-40 |  
+| 2 | 0.1408037 |
+| 3 | 0.6454258 |
+| 4 | 0.2137705 |
+
+The uncertainty of this prediction is $1 - 0.645 \hat p_k = 0,355$. 
+A quite high uncertainty indicates that the new unit is ambiguously assigned to its cluster, lying near the boundary of the cluster's region.
+
+**Applicative interpretation**: A snapper of length 7 inches is most likely a adult fish, consistent with the age class represented by cluster 3.
