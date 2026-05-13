@@ -1,0 +1,266 @@
+---
+title: "Fac_simile3"
+output: html_document
+date: "2026-05-13"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+Consider the bivariate Gaussian distribution (X1, X2) ∼ N(µX, µY , σX, σY , σXY ).
+### 1) Generate 3000 realizations from a bivariate Gaussian distribution with the following parameter values:(X1, X2) ∼ N(2, 2, 100, 100, 4). Set the seed to the value of 14263. Comment on the generated data data.
+
+```{r}
+library(mvtnorm)
+ 
+set.seed(625)
+ 
+# vettore delle medie
+mu <- c(2, 2)
+ 
+# matrice di varianza-covarianza
+# diagonale = varianze (sigma^2), fuori diagonale = covarianze
+sigma <- matrix(c(1000, 4,
+                  4, 1000), ncol = 2)
+ 
+# generazione
+X <- rmvnorm(n = 3000, mean = mu, sigma = sigma)
+```
+
+
+```{r}
+skimr::skim_without_charts(X)
+```
+The variables V1 and V2 are generated from a normal bivariate distribution with parameters N(2, 2, 100, 100, 4). 
+Looking more in depth at the variables, we can see that for the variable V1 the mean is 
+2.339191 and the median is 1.887266: their similarity suggests 
+that the distribution is approximately symmetric around the 
+central value.
+
+Regarding variability, the standard deviation is 30.864, indicating that the 
+observations deviate on average by approximately 30.864 units from the mean. 
+The interquartile range is 41,52, with one-quarter of the observations below 
+-18.49036	and another quarter above 23.03019. The total range is from -97.42286 to 114.4190, 
+approximately 5,102 times the IQR, suggesting that there are some extreme values in the tails.
+
+for the variable v2 the mean is 2.308987 and the median is 1.788275: their similarity suggests that the distribution is approximately symmetric around the central value.
+
+Regarding variability, the standard deviation is 31.40208	, indicating that the 
+observations deviate on average by approximately 31.40208	 units from the mean. 
+The interquartile range is 41,52 (same as for the V1 variable, having the same variance), with one-quarter of the observations below 
+-18.70734	and another quarter above 22.95559	 The total range is from -116.42284 to 138.0773,  
+approximately 6,12 times the IQR, also in this case, and even more then with respect to the previous one, suggesting the presence of extreme values in both tails.
+
+
+The univariate descriptives indicate that both variables appear consistent with a normal distribution. The bivariate analysis performed in the next section will further assess the joint distribution and the association between the two variables.
+
+### 2 Draw the scatter plot of the realizations and comment on it.
+
+```{r}
+plot(X[, 1], X[, 2], col = "blue", main = "Scatter plot",
+xlab = "First component (X)", ylab = "Second component (Y)")
+
+```
+The scatterplot reports the joint distribution of V1 and V2 for 
+the $n = 3000$ observations in the sample, with v1 on the horizontal 
+axis and v2 on the vertical axis. The maxium density is in the central zone, in proximity with the vector of averages (mu1, mu2) and becomes smaller going further in both directions X1 and X2
+
+The range of variation is approximately the same for the two components, indicating that the corresponding 
+variances are the same, as we said before. 
+
+The points are arranged in a region of elliptical shape, 
+without a well-defined orientation, but with a slight orientation along the "/" 
+direction. This behaviour indicates that the 
+covariance is positive but with a not-much influent value.
+
+
+### 3 Calculate the theoretical density for some values of X and Y . Depict the density plot in three dimensions. Comment on the shape of the distribution.
+
+```{r}
+cor(X[, 1], X[, 2])
+```
+
+```{r}
+library(scatterplot3d)
+ 
+z1 <- seq(min(X[, 1]), max(X[, 1]), length.out = 50)
+z2 <- seq(min(X[, 2]), max(X[, 2]), length.out = 50)
+grid <- expand.grid(z1, z2)
+dens <- matrix(dmvnorm(grid, mean = mu, sigma = sigma),
+               ncol = length(z1), byrow = TRUE)
+ 
+plot3d <- scatterplot3d(z1, z2,
+                        seq(min(dens), max(dens), length.out = length(z1)),
+                        type = "n", angle = 70, grid = FALSE,
+                        main = "Densità teorica bivariata",
+                        xlab = expression(X[1]), ylab = expression(X[2]),
+                        zlab = "f(X1, X2)")
+ 
+for (i in length(z1):1) {
+  plot3d$points3d(rep(z1[i], length(z2)), z2, dens[i, ],
+                  type = "l", col = "darkorange")
+}
+for (i in length(z2):1) {
+  plot3d$points3d(z1, rep(z2[i], length(z1)), dens[, i],
+                  type = "l", col = "darkorange")
+}
+```
+The scatter3d shows the bivariate normal density of V1 and 
+V2 with μ = (2.339191, 2.308987) and correlation ρ = 0.04244601. The surface 
+peaks at the mean and decays smoothly in every direction. The elliptical 
+contours looks axis-aligned, indicating an almost null linear dependence between the two 
+variables.
+
+```{r}
+grid <- expand.grid(z1, z2)
+dens <- matrix(dmvnorm(grid, mean = mu, sigma = sigma), ncol = length(z1))
+ 
+contour(z1, z2, dens,
+        col = "blue",
+        main = "Contour plot",
+        xlab = expression(X[1]), ylab = expression(X[2]),
+        asp = 1) 
+```
+The contour plot displays the level sets of the bivariate normal density of 
+V1 and V2, with mean vector μ = (2.339191, 2.308987) and 
+correlation ρ =  ρ = 0.04244601. Each curve connects points of equal density, providing 
+a 2D projection of the underlying 3D surface.
+
+The contours are **elliptical** and concentric around the mean, which corresponds to the mode of the distribution. Their geometry 
+reflects the covariance structure:
+
+- **Orientation:** the ellipses are aligned with the coordinate axes, 
+  consistent with a negligible correlation ρ = 0.04244601..
+- **Eccentricity:** the ellipses are nearly circular, indicating that the linear dependence between 
+  V1 and V2 is weak and almost null.
+- **Axis spread:** the ellipses extend similarly along both axes, reflecting σ_x ≈ σ_y.
+
+The innermost contour identifies the region of highest probability mass, while outer contours enclose increasingly larger probability regions (e.g. 
+the ellipse at level corresponding to χ²₂(0.95) contains approximately 95% of the distribution).
+
+
+
+
+## Es 2
+Researchers of an American company of micro devices collected data recording the circuit board assembly support costs (Scost). The data is found in
+device.Rdata.
+
+### .1 Provide a summary of the observed data and comment. Depict the empirical cumulative distribution function of the variable Scost and comment on its shape and on some of its values.
+
+```{r}
+load("data/device.Rdata")
+skimr::skim_without_charts(device)
+IQR(device$Scost)
+```
+
+The dataset is made un 100 observations of 4 variables: Scost, Hours, Boards and Cycle. It does not present null/missing values and has a complete rate of 1.
+
+Doing a more in depth analysis the variables that compose the data: starting from the variable Scost, its mean is 
+12.00000 and the median is 11.500: their value is pretty similar and suggests 
+that the distribution is approximately symmetric around the 
+central value, even tho we can see that there are some values (ex max = 24.5) that tend to inflate the mean.
+
+Regarding variability, the standard deviation is 3.2644396, indicating that the 
+observations deviate on average by approximately 3.2644396 units from the mean. 
+The interquartile range is 3, with one-quarter of the observations below 
+10.500 and another quarter above 13.500. The total range is from 5.500 to 24.500, 
+approximately 6,33 times the IQR, suggesting the presence of heavy tails in the distribution.
+
+The Hour variable has a mean value of 1.56510 and the median is 1.635: their similarity suggests 
+that the distribution is approximately symmetric around the 
+central value. The same can be said also for the other variables (Boards and Cycle), with similar values for median and mean. Although, in these case where we have small values for the observations, we always have to be careful since even if the absolute value difference can be seen as small, it could be still significative.
+
+For these variables, for the reason we have just said, it is better to compute the **Coefficient of variation** ($\sigma/\mu$) over then the simple SD which could be less significative. This because the CV is a dimensionless measure of 
+variability, useful to compare across variables with different scales. The variable Hour present a CV of value: 0.238, the variable Boards of 0.25 and 0.29 for the Cycle variable: we can conclude that being in a range of 0.2 to 0.3 all of these variables present an intermediate value of variability
+
+```{r}
+plot(ecdf(device$Scost),
+     main = "ECDF of scost",
+     xlab = "x",
+     ylab = expression(F[n](x)))
+```
+
+The empirical cumulative distribution function (ECDF) of the variable 
+Scost estimates non-parametrically the underlying distribution by 
+reporting, for each value $x$, the proportion of observations not 
+exceeding it. By construction it is a non-decreasing step function valued 
+in $[0, 1]$, with jumps of size $1/n$ at each observed data point, and 
+by the Glivenko–Cantelli theorem it converges uniformly to the 
+theoretical CDF as $n$ grows.
+
+From the plot we observe that the ECDF steep around the central 
+values, indicating a distribution 
+[concentrated / spread out] around the median value. The curve crosses the level 
+$0.5$ at approximately $x = $ 11.500, while the levels $0.25$ and 
+$0.75$ are reached at 10.500 and 13.500, giving an interquartile range of 
+3. The lower and upper tails approach $0$ and $1$ 
+gradually, suggesting few extreme values, and 
+the overall shape appears slightly right-skewed around the median.
+
+### 2 Estimate a clustering model supposing a finite mixture model. Perform model selection and describe the results.
+
+```{r}
+library(mclust)
+
+# selezione automatica di K e modello basata su BIC
+mod_clust <- mclustBIC(device, G = 1:9)
+
+```
+
+
+```{r}
+mod_clust <- Mclust(device, x = mod_clust)
+summary(mod_clust, parameters = TRUE)
+```
+
+```{r}
+plot(mod_clust, what = "BIC")
+```
+The selected model is **VEV (ellipsoidal, equal shape)** with **2 
+components**, indicating that the data are best described by clusters with 
+same shape, but different volumes and orientations.
+
+The summary of the model reports the value of the **log-likelihood at 
+convergence** (equal to 48.93372	), the **BIC** and **ICL** indices 
+(-21.86699 and -41.56371
+1 row), the **number of observations** (100) 
+and the **degrees of freedom** — computed as the number of free parameters 
+estimated by the model (26).
+
+The output also provides the **number of observations classified in each 
+cluster** by the MAP rule. We observe that cluster A is similarly sized to cluster B with 51 observations against 49.
+
+
+### Comment on the values of the estimated parameters provided by the summary function of the selected model at the previous point.
+
+The parameters of the estimated mixture model are:
+
+**(i)** the **mixing probabilities (weights)** of the `[K]` mixture components,
+**(ii)** the **means** of the components,  
+**(iii)** the **variances** (or covariance matrices, in the multivariate case).
+
+**Mixing weights**: The 2 components have weights of 0.534 0.466, 
+respectively. Note that these values represent the **estimated proportions 
+of the population** belonging to each component — they do not necessarily 
+coincide with the empirical proportions of subjects allocated to each group 
+by the MAP rule.
+
+**Means**: The mean value of Scost for subjects in component 1 
+is 13.545071, higher of around thre units than the corresponding value 
+for component 2 (10.230). We can therefore characterize the 2 
+subpopulations based on the value of Scost:  
+higher values on average for the first cluster, lower for the second.
+
+**Variances**: The variance values for the components are
+different, consistent with the model code VEV selected, in which clusters have the same shape but different volume and orientation. 
+
+### 4 Illustrate the assumptions under the classical multiple linear regression model.
+
+The five assumptions under the classical multiple linear regression model are:
+1. **Linearity**: response is a linear and additive function of covariates
+2. **Zero-mean errors**: $\mathbb{E}[\epsilon_i] = 0$
+3. **Homoscedasticity**: $\text{Var}(\epsilon_i) = \sigma^2$ constant for all $i$
+4. **Independence**: $\text{Cov}(\epsilon_i, \epsilon_j) = 0$ for $i \neq j$
+5. **Normality** (needed for t-test, F-test, CI): $\epsilon_i \sim \mathcal{N}(0, \sigma^2)$

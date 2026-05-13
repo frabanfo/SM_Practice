@@ -2984,14 +2984,34 @@ I modelli sono codificati con **3 lettere** (volume, forma, orientazione):
 | V | Variabile tra cluster |
 | I | Identità / sferico |
 
-| Codice | Volume | Forma | Orientazione | Descrizione geometrica |
-|--------|--------|-------|-------------|------------------------|
-| **EII** | E | I | I | Cluster sferici, stessa dimensione |
-| **VII** | V | I | I | Cluster sferici, dimensioni diverse |
-| **EEI** | E | E | I | Cov. diagonale, allineata agli assi, stessa forma e volume |
-| **VVI** | V | V | I | Cov. diagonale, allineata agli assi, forme e volumi diversi |
-| **EEE** | E | E | E | Stesso ellissoide per tutti (solo le medie differiscono) |
-| **VVV** | V | V | V | Completamente flessibile — ogni cluster ha il proprio ellissoide |
+### Univariate case (1 variable)
+
+Only two models are available, since shape and orientation are not 
+defined in dimension 1:
+
+| Code | Volume (variance) | Geometric meaning                        |
+|------|-------------------|------------------------------------------|
+| `E`  | Equal             | All clusters share the same variance     |
+| `V`  | Varying           | Each cluster has its own variance        |
+
+### Multivariate case (≥ 2 variables)
+
+| Code  | Volume   | Shape    | Orientation | Geometric meaning                                                                 |
+|-------|----------|----------|-------------|------------------------------------------------------------------------------------|
+| `EII` | Equal    | Spherical| —           | Identical spheres in all clusters                                                  |
+| `VII` | Varying  | Spherical| —           | Spheres of different sizes across clusters                                         |
+| `EEI` | Equal    | Equal    | Axes        | Identical axis-aligned ellipsoids                                                  |
+| `VEI` | Varying  | Equal    | Axes        | Same shape and orientation (axes), different volumes                               |
+| `EVI` | Equal    | Varying  | Axes        | Same volume, different shapes, all axis-aligned                                    |
+| `VVI` | Varying  | Varying  | Axes        | Different volume and shape, but all axis-aligned                                   |
+| `EEE` | Equal    | Equal    | Equal       | Identical ellipsoids (same volume, shape and orientation)                          |
+| `VEE` | Varying  | Equal    | Equal       | Same shape and orientation, different volumes                                      |
+| `EVE` | Equal    | Varying  | Equal       | Same volume and orientation, different shapes                                      |
+| `VVE` | Varying  | Varying  | Equal       | Different volume and shape, common orientation                                     |
+| `EEV` | Equal    | Equal    | Varying     | Same volume and shape, different orientations                                      |
+| `VEV` | Varying  | Equal    | Varying     | Same shape, different volumes and orientations                                     |
+| `EVV` | Equal    | Varying  | Varying     | Same volume, different shapes and orientations                                     |
+| `VVV` | Varying  | Varying  | Varying     | Fully unconstrained: every cluster has its own volume, shape and orientation       |
 
 > **Trade-off**: da EII (più parsimonioso) a VVV (più flessibile). VVV può overfittare con $K$ grande o $n$ piccolo.
 
@@ -3074,7 +3094,8 @@ is `[μ_1]`, `[much lower / similar / higher]` than the corresponding value
 for component 2 (`[μ_2]`). We can therefore characterize the `[K]` 
 subpopulations based on the value of `[variable]`: `[describe direction: 
 higher / lower]` values on average for `[component A]`, `[higher / lower]` 
-for `[component B]`.
+for `[component B]`, suggesting that the mixture model is capturing a meaningful distinction 
+between a [high value of variable] and a [low value of variable] subpopulation.
 
 **Variances**: The variance values for the components are `[equal / 
 different]`, consistent with the model code `[model_code, e.g., EEE, VVV]` 
