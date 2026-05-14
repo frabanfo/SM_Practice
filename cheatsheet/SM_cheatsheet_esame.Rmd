@@ -59,6 +59,10 @@ load("path/to/file.RData")
 
 # Da .txt con separatore tab o spazio
 df <- read.table("path/to/file.txt", header = TRUE, sep = "\t")
+
+# select a subset of columns
+data = df[, c(1,2,4)]
+
 ```
 
 ## Template — Descriptive statistics for initial data inspection
@@ -921,10 +925,101 @@ ggpairs(df)
 # sotto diagonale: scatterplot
 # sopra diagonale: correlazioni con livelli di significatività
 ```
+**Scatterplot Matrix Comment**
 
+
+The scatterplot matrix displays the pairwise relationships between the 
+variables of interest, with trend lines (LOWESS / linear fit) helping to 
+visually assess the **direction**, the **strength** and the **shape** of 
+each bivariate association, as well as the possible presence of 
+**clusters**, **outliers** or **non-homogeneous regions** of the data.
+
+**General pattern.** A first look at the matrix reveals that the 
+observations [are uniformly spread across the plots / show a clear 
+structure with well-separated groups / are concentrated in a specific 
+region of the plane / display some isolated points that may be 
+outliers]. [If a group structure is visible:] in particular, the points 
+appear to be divided into [N_GROUPS] groups corresponding to values of 
+**[GROUPING_VAR]** in different ranges. The presence of such patterns 
+complicates the interpretation of a potential global association, since 
+the within-group and between-group relationships may differ.
+
+**Pairwise associations.** Looking at the off-diagonal panels, we can 
+describe the relationships in terms of direction, strength and shape:
+
+- **[VAR_i] vs [VAR_j]**: the two variables show a [strong / moderate / 
+  weak] [positive / negative] and [approximately linear / clearly 
+  nonlinear / monotonic but not linear] association. An increase in 
+  **[VAR_i]** [implies an increase / implies a decrease / produces no 
+  clear change] in **[VAR_j]**. The points are [tightly concentrated / 
+  moderately dispersed / very dispersed] around the trend line, 
+  suggesting a [strong / moderate / weak] linear dependence.
+
+Enrichment
+
+- a **change in the direction** of the trend over different ranges of 
+  one variable (piecewise / nonlinear relationship);
+- a **concentration of observations** in a specific portion of the plot, 
+  which may influence the visual impression and the value of summary 
+  measures such as Pearson's correlation;
+- the **absence of any clear pattern**, suggesting that the two 
+  variables are essentially uncorrelated;
+- the presence of **influential points** lying far from the bulk of the 
+  data.
 
 ### Visualizzazione matrici di correlazione: corrplot
- 
+
+### Correlations and partial correlations
+```{r COR, eval=FALSE}
+round(cor(dat), 3)
+round(ggm::parcor(cov(dat)), 3)
+```
+
+
+The two matrices report respectively the **raw (Pearson) correlations** 
+between each pair of variables and the **partial correlations**, which 
+measure the linear association between two variables after removing the 
+linear effect of all the remaining ones. Comparing the two matrices is 
+useful to assess whether the observed associations are *direct* or 
+rather *mediated* by other variables in the dataset.
+
+- Considering the matrix of **raw correlations**, the highest coefficient 
+  (in absolute value) is the one between **[VAR_1]** and **[VAR_2]**, 
+  equal to **[RAW_CORR]**. The corresponding partial correlation is equal 
+  to **[PAR_CORR]**, [practically identical / slightly different / 
+  noticeably different], highlighting that the interaction of the 
+  remaining variables [has no effect / has a marginal effect / 
+  substantially modifies] the association between these two variables. 
+  It is important to remark that, as shown by the corresponding 
+  scatterplot, this association is [linear / not linear], so the 
+  obtained value must be handled with [confidence / care].
+
+- A [similar / analogous / weaker / stronger] outcome is observed for 
+  the pair **[VAR_3]** and **[VAR_4]**, whose raw and partial 
+  correlation coefficients are equal to **[RAW_CORR]** and **[PAR_CORR]** 
+  respectively. The two values are [very close / different], suggesting 
+  that the remaining variables [do not play / play] a relevant role in 
+  shaping this association.
+
+- Finally, for the pair **[VAR_5]** and **[VAR_6]** we observe a 
+  [significant / appreciable] modification between the raw and the 
+  partial correlation coefficient: while the former is 
+  [positive / negative] (equal to **[RAW_CORR]**, denoting a 
+  [strong / moderate / weak] linear association), the latter becomes 
+  [positive / negative] (equal to **[PAR_CORR]**). This means that the 
+  [positive / negative] association observed in the raw correlation is 
+  largely due to the interaction of **[CONFOUNDER]**: once this effect 
+  is ruled out, the two variables show a [positive / negative] 
+  association — an increase in **[VAR_5]** corresponds to a 
+  [increase / decrease] in **[VAR_6]**, and vice-versa.
+
+Overall, comparing the two matrices shows that the associations among 
+the variables are [mostly direct / partly mediated by other variables / 
+strongly influenced by confounding effects], confirming the importance 
+of complementing raw correlations with partial correlations whenever 
+several variables are jointly analyzed.
+
+
 ```{r corrplot, eval=FALSE}
 library(corrplot)
  
@@ -947,7 +1042,7 @@ corrplot(cor(df), type = "upper", method = "circle", title = "Raw")
 corrplot(pcor(df)$estimate, type = "upper", method = "circle", title = "Partial")
 par(mfrow = c(1, 1))
 ```
- 
+
 > **Trucco**: `corrplot` affiancati di correlazioni *raw* vs *partial* è il modo più rapido per individuare confondenti e relazioni spurie a colpo d'occhio.
  
 ### Trappole comuni nelle misure di associazione
@@ -1337,7 +1432,7 @@ Per la **media** in campioni grandi, i due CI tendono a coincidere (TLC garantis
 The accuracy of the estimator $\hat\theta = $ `[describe statistic]` is assessed 
 via the nonparametric bootstrap with $B = [B]$ replications. This procedure 
 allows estimation of the standard error and the construction of confidence 
-intervals without relying on distributional assumptions, which is particularly 
+intervals without relyfing on distributional assumptions, which is particularly 
 useful given `[reason: small sample size / unknown distribution / non-standard 
 estimator]`.
 
@@ -1871,6 +1966,56 @@ of linearity of the [response / logit] in the continuous covariates.
 [Optional: "Possible remedies include adding a quadratic term, a log 
 transformation of the covariate, or using a more flexible model."]
 
+### Residals plot
+```{r, eval=FALSE}
+plot(mod$residuals,
+    main = "Residuals scatter plot",
+    xlab = "ID", ylab = "Residual",
+    col = "blue")
+abline(h = 0, col = "red")
+
+```
+
+**Residual plot.** The plot displays the residuals 
+$\hat\varepsilon_i = y_i - \hat y_i$ against the observation index (or 
+against the fitted values), together with a reference horizontal line at 
+zero. Under the assumptions of the linear model, the residuals should 
+appear as a **random scatter** around zero, with no visible pattern, no 
+trend and roughly constant variability. From the plot we observe that 
+the residuals are [evenly distributed / show a clear pattern / display 
+non-constant spread] around zero, suggesting that the assumptions of 
+**zero conditional mean** and **homoscedasticity** are 
+[reasonably satisfied / questionable / clearly violated]. A few points 
+fall noticeably outside the bulk of the data, which may correspond to 
+[mild outliers / influential observations] worth a closer inspection.
+
+### Residuals vs fitTed 
+```{r,eval=FALSE}
+plot(mod$fitted,
+    mod$residuals,
+    main = "Residuals vs Fitted values",
+    xlab = "Fitted values", ylab = "Residuals",
+    col = "blue")
+abline(h = 0, col = "red")
+
+```
+
+**Residuals vs Fitted.** The plot shows the residuals 
+$\hat\varepsilon_i$ against the fitted values $\hat y_i$, with a 
+smoothing curve (red LOWESS line) and the horizontal reference line at 
+zero. The plot is used to diagnose two key assumptions of the linear 
+model: **linearity** of the systematic part (the smoother should lie 
+close to the zero line) and **homoscedasticity** (the vertical spread of 
+the residuals should be roughly constant across the range of fitted 
+values). From the plot we observe that the residuals are 
+[symmetrically distributed / systematically off] around zero, with the 
+smoothing curve [practically flat / showing a clear curvature], and 
+their spread appears [approximately constant / increasing / decreasing] 
+as the fitted values grow. This suggests that the assumptions of 
+linearity and constant variance are [reasonably satisfied / 
+questionable / clearly violated], and that 
+[no action / a transformation of $y$ or of the predictors / a more 
+
 ### The four diagnostic plots
 
 ```{r diagnostic-plots, eval=FALSE}
@@ -1878,6 +2023,34 @@ par(mfrow = c(2, 2))
 plot(mod)
 par(mfrow = c(1, 1))
 ```
+
+### o2 estimate
+
+```{r, eval=FALSE}
+n <- dim(data)[1]
+p <- dim(data)[2]
+s2 <- sum(mod_full$residuals^2)/(n-p); s2
+s <- sqrt(s2); s
+```
+
+**Residual variance and standard deviation.** The residual variance is 
+estimated as 
+
+$$
+\hat\sigma^2 \;=\; \frac{1}{n - p}\sum_{i=1}^{n} \hat\varepsilon_i^2 \;=\; 
+[S2_VALUE],
+$$ 
+
+where $n = $ [N] is the sample size and $p = $ [P] the number of 
+estimated parameters, so that $n - p = $ [DF] represent the residual 
+degrees of freedom. The corresponding residual standard error is 
+$\hat\sigma = $ **[S_VALUE]**, which can be interpreted as the average 
+deviation of the observed responses from the fitted values: on average, 
+the model predictions deviate from the true values by approximately 
+**[S_VALUE]** units of $y$. This quantity is the unbiased estimator of 
+$\sigma$ under the standard linear model assumptions and provides the 
+scale used to compute standard errors, confidence intervals and 
+hypothesis tests on the regression coefficients.
 
 R produces four plots — what to look for in each:
 
@@ -1967,7 +2140,46 @@ For unusual observations:
 
 For multicollinearity:
 
-> The variable `[name]` has a VIF of `[value]`, exceeding the threshold of 10 (or 5). This indicates substantial multicollinearity, which inflates the standard errors of the regression coefficients and reduces the power of the t-tests. The high VIF is consistent with the strong correlation observed between `[variable]` and `[other variable]` in the correlation matrix.
+The **Variance Inflation Factor** measures how much the variance of the 
+estimated regression coefficient of a predictor is inflated due to 
+**collinearity** with the other predictors in the model. For the $j$-th 
+covariate it is defined as 
+
+$$
+\mathrm{VIF}_j \;=\; \frac{1}{1 - R^2_j},
+$$ 
+
+where $R^2_j$ is the coefficient of determination obtained by regressing 
+the $j$-th predictor on all the others. A VIF equal to 1 indicates the 
+absence of linear association with the remaining covariates, while large 
+values reveal the presence of multicollinearity. The following thresholds 
+are commonly used as a rule of thumb:
+
+- $\mathrm{VIF} < 5$ → **no concern**, collinearity is mild;
+- $5 \leq \mathrm{VIF} < 10$ → **moderate** collinearity, worth monitoring;
+- $\mathrm{VIF} \geq 10$ → **severe** collinearity, the estimates of the 
+  affected coefficients become unstable and difficult to interpret.
+
+In our model we obtain $\mathrm{VIF}_{[VAR_1]} = $ **[VIF_1]** and 
+$\mathrm{VIF}_{[VAR_2]} = $ **[VIF_2]** (and so on for the remaining 
+predictors). These values are [all below 5 / between 5 and 10 / above 
+10], indicating [no relevant / moderate / severe] multicollinearity 
+issues. 
+The fact that the two VIFs are [identical / very similar / 
+different] is consistent with the structure of the model: when only two 
+predictors are included, $\mathrm{VIF}_1 = \mathrm{VIF}_2 = 
+1 / (1 - r_{12}^2)$, so both quantities reduce to a function of the 
+pairwise correlation $r_{12}$ between the two covariates. In particular, 
+from $\mathrm{VIF} = $ [VIF_VALUE] we can recover $r_{12}^2 = 
+1 - 1/\mathrm{VIF} = $ **[R2_VALUE]**, corresponding to a correlation in 
+absolute value of approximately **[CORR_VALUE]**, which is fully 
+consistent with the value reported in the correlation matrix.
+
+Overall, the VIF analysis suggests that the estimated coefficients can be 
+interpreted [with confidence / with some caution / with strong caution], 
+and that [no action / centering or rescaling / dropping one of the 
+collinear predictors / using regularization (ridge, lasso)] is required 
+to obtain stable estimate
 
 ---
 
