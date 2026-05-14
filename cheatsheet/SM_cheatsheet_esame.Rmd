@@ -94,7 +94,20 @@ skim_without_charts(data.frame(x = x))
 
 
 ```{r, eval=FALSE}
-boxplot(df)
+boxplot(x,
+        main   = "Title",
+        ylab   = "Variable (unit)",
+        col    = "#A8C8E1",
+        border = "#1F4E79",
+        boxwex = 0.5,
+        outpch = 19,
+        outcol = "#C0392B",
+        las    = 1,
+        frame  = FALSE)
+
+# media come pallino nero
+points(mean(x, na.rm = TRUE), pch = 18, col = "black", cex = 1.3)
+
 plot(density(df))
 ```
 
@@ -114,6 +127,27 @@ The density plot of `[variable]` shows a `[unimodal/bimodal]`,
 `[symmetric/right-skewed/left-skewed]` distribution with mode around 
 `[value]`. The shape is `[consistent with / suggests deviation from]` 
 a normal distribution, which can be further verified via a Q-Q plot.
+
+### se bimodale e voglio trovare picchi 
+```{r, eval = FALSE}
+d = density(haemoglobin)
+
+#UN PICCO
+# valore della densità al picco (altezza)
+peak_y <- max(d$y); peak_y
+# punto in cui la densità è massima (la moda stimata)
+peak_x <- d$x[which.max(d$y)]; peak_x
+cat("Peak at x =", round(peak_x, 4),
+    "with density =", round(peak_y, 4), "\n")
+
+#PIU PICCHI
+local_max <- which(diff(sign(diff(d$y))) == -2) + 1
+modes <- data.frame(x = d$x[local_max],
+                    y = d$y[local_max])
+modes <- modes[order(-modes$y), ]   # ordinate dalla più alta
+modes
+```
+
 
 #### Case 2 — Two continuous variables (e.g., Es. 12 two servers)
 
@@ -916,7 +950,7 @@ plot(df$x, df$y,
 abline(lm(y ~ x, data = df), col = "red")    # retta di regressione opzionale
  
 # scatterplot matrix (base)
-pairs(df, panel = panel.smooth, main = "Scatterplot matrix")
+pairs(df, panel = panel.smooth, main = "Scatterplot matrix", lower.panel = NULL)
  
 # versione informativa con GGally
 library(GGally)
@@ -3231,11 +3265,23 @@ defined in dimension 1:
 
 ## Fit del modello con mclust
 
+The function mclust::mclustBIC() is used to estimate mixture models for an increasing
+number of components (from 1 to 9). By default, the function considers both the models
+that assume equal variance among the different components (the more parsimonious model,
+specified with the letter “E”) and the models with specific variance for each component
+(specified with the letter “V”). All estimated models are compared using the BIC criterion
+to select those that have a better fit
+
 ```{r mclust-fit, eval=FALSE}
 library(mclust)
+#autosel
+mod_clust <- mclustBIC(df)
+mod_clust
 
-# selezione automatica di K e modello basata su BIC
-mod_clust <- Mclust(df, G = 1:9,, modelNames = "e/v")
+# then manually
+mod_clust <- Mclust(df, G = 1:9, modelNames = "e/v")
+#or
+mod_clust <- Mclust(df, x = mod_clust)
 
 # output principali
 summary(mod_clust)              # info sintetica: modello, K, log-lik, BIC
@@ -3534,6 +3580,14 @@ legend("topright",
        legend = c("Mixture density", "Component densities"),
        col = c("red", "blue"),
        lty = c(1, 2), lwd = 2, cex = 0.7)
+```
+
+
+```{r, eval = FALSE}
+plot(mod, what = 'density', data = haemoglobin,
+xlab = "Haemoglobin")
+abline(v = mod$parameters$mean, col = rep("red", 2), lty = c(2, 2))
+
 ```
 
 **Comment template — mixture density + histogram:**

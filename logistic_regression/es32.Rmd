@@ -1,0 +1,209 @@
+---
+title: "es32"
+author: "me"
+date: "2026-05-14"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 6,
+  fig.height = 4,
+  fig.align = "center"
+)
+```
+
+Consider the data in the file called haemoglobin.Rdata. These are measurements
+observed for 70 individuals of a plasma component. Assuming the presence of potential groups of individuals with distinct values of this component, we aim to estimate these latent subpopulations
+
+```{r}
+load("data/haemoglobin.Rdata")
+head(haemoglobin)
+```
+### 1 Describe the data using descriptive statistics and graphical displays.
+
+```{r}
+skimr::skim_without_charts(haemoglobin)
+IQR(haemoglobin)
+```
+
+The dataset consists of 70 observations of plasma components for different individuals. It is composed of a single variable with no missing or null values, having a complete rate of 1.
+
+The descriptive statistics for the observations are as follows. The mean is 
+151.5523 and the median is 138.7682: their difference of about 13 units suggests that the distribution is slighly asymmetric around the central value, suggesting a possible right skewness.
+
+Regarding variability, the standard deviation is 82.475, indicating that the 
+observations deviate on average by approximately 82.475 units from the mean, an important value to be taken into consideration. 
+The interquartile range is 140.4203, with one-quarter of the observations below
+81.23581 and another quarter above 221.6562. The total range is from 22.551 to 359.844, approximately 2,40 times the IQR, consistent with a normal-like distribution.
+
+
+```{r}
+boxplot(haemoglobin,
+        main   = "Haemoglobin distribution",
+        ylab   = "Plasma",
+        col    = "#A8C8E1",
+        border = "#1F4E79",
+        boxwex = 0.5,
+        outpch = 19,
+        outcol = "#C0392B",
+        las    = 1,
+        frame  = FALSE)
+
+# media come pallino nero
+points(mean(haemoglobin, na.rm = TRUE), pch = 18, col = "black", cex = 1.3)
+```
+
+
+The boxplot of plasma observations shows a median of approximately 138, 
+with the central 50% of the observations concentrated between 81 and 
+221. The box appears slightly asymmetric as expected from the descriptive statistics, with the median shifted toward Q1, with a right skewness.
+
+The whiskers extend from 359 to 22. Zero observations fall outside the whiskers and are flagged as potential outliers.
+
+```{r}
+plot(density(haemoglobin))
+```
+```{r}
+d = density(haemoglobin)
+local_max <- which(diff(sign(diff(d$y))) == -2) + 1
+modes <- data.frame(x = d$x[local_max],
+                    y = d$y[local_max])
+modes <- modes[order(-modes$y), ]   # ordinate dalla più alta
+modes
+```
+
+
+The density plot of plasma shows a bimodal, right-skewed distribution with mode around 93 and 217. The shape is not consistent with a normal distribution, which can be further verified via a Q-Q plot.This pattern suggests instead the presence of two latent subpopulations in the distribution.
+
+
+### 2 Estimate a finite mixture model using the mclust package, performing model selection to choose the suitable number of clusters and the most parsimonious parameterization of the component variances through the Bayesian Information Criterion
+
+The function mclust::mclustBIC() is used to estimate mixture models for an increasing
+number of components (from 1 to 9). By default, the function considers both the models
+that assume equal variance among the different components (the more parsimonious model,
+specified with the letter “E”) and the models with specific variance for each component
+(specified with the letter “V”). All estimated models are compared using the BIC criterion
+to select those that have a better fit
+```{r}
+require(mclust)
+mod_clust <- mclustBIC(haemoglobin)
+mod_clust
+```
+
+
+Since this is an univariate case, only two models are available, since shape and orientation are not defined in dimension 1. The selected model was an E (equal variance) model with 2 clusters, as expected from the previously done density plot. In the previous table, we can see that out of all of the combinations of 1 to 9 clusters and E/V this was the one that optimized the selection criteria (BIC)
+
+```{r}
+mod_clust <- Mclust(haemoglobin, G = 2, modelNames = "E")
+summary(mod_clust)
+```
+The summary of the model reports the value of the **log-likelihood at 
+convergence** (equal to -402.80), the **BIC** and **ICL** indices 
+(-822. and -832.2396), the **number of observations** 70 
+and the **degrees of freedom** — computed as the number of free parameters 
+estimated by the model (4).
+
+The output also provides the **number of observations classified in each 
+cluster** by the MAP rule. We observe that 43 observation of cluster 1 is larger than 27 observations of cluster 2.
+
+
+### Comment on the estimated parameters of the mixture model with reference to the context of the data.
+
+```{r}
+summary(mod_clust, parameters = TRUE)
+```
+
+
+The parameters of the estimated mixture model are:
+
+**(i)** the **mixing probabilities (weights)** of the 2 mixture components
+
+**(ii)** the **means** of the components
+
+**(iii)** the **variances** (or covariance matrices, in the multivariate case).
+
+**Mixing weights**: The 2 components have weights of 0.613, 0.387`, 
+respectively. Note that these values represent the **estimated proportions 
+of the population** belonging to each component — they do not necessarily 
+coincide with the empirical proportions of subjects allocated to each group 
+by the MAP rule.
+
+**Means**: The mean value of the plasma for subjects in component 1 
+is 97.435, much lower than the corresponding value 
+for component 2 (237.369). We can therefore characterize the 2 
+sub-populations based on the value of the plasma:
+higher values on average for plasma for the group A, lower for group B, suggesting that the mixture model is capturing a meaningful distinction 
+between a high value of the plasma and a low value of plasma subpopulation.
+
+**Variances**: The variance values for the components are equal, consistent with the model code E selected. The corresponding standard deviation is approximately 45.39; this value represents the average variability around the mean of each 
+component.
+
+
+### 5 Provide a classification of each individual. How is this classification obtained? What can we learn from these results for the applicative problem at hand?
+
+```{r}
+mod_clust$classification
+prop.table(table(mod_clust$classification))
+```
+
+The classification of each individual is obtained by applying the **MAP rule 
+(Maximum A Posteriori)**: each unit is assigned to the cluster with the 
+highest estimated posterior probability of membership. Specifically:
+
+$$
+\hat z_i = \arg\max_{k = 1, \dots, K} \hat p_{ik}
+$$
+
+where $\hat p_{ik}$ is the estimated posterior probability that unit $i$ 
+belongs to cluster $k$, computed via Bayes' rule using the estimated 
+mixing weights and component densities.
+
+The resulting classification produces 2 groups with sizes 43 AND 27. 
+(empirical proportions: 0.614 and 0.386). These empirical proportions are 
+close to the estimated mixing weights 0.613 and 0.387, as expected: the mixing weights estimate the **population-level** proportions, while the empirical proportions reflect the **sample-level** 
+classification.
+
+**Applicative interpretation**: 
+
+For the application at hand, this classification allows us to distinguish between two latent subpopulations of patients based on their 
+haemoglobin levels, potentially corresponding to clinical categories such 
+as anaemic vs healthy individuals. The model thus provides a data-driven, unsupervised classification of subjects without needing pre-existing labels.
+
+
+### .6 Draw a graph showing the clustering partition.
+```{r}
+stripchart(haemoglobin ~ mod_clust$classification,
+           method = "jitter", pch = 16,
+           col = c("salmon", "steelblue"),
+           main = "Cluster partition",
+           xlab = "Haemoglobin")
+
+```
+
+The plot shows the partition of the sample into 2 clusters, with each 
+unit colored according to its MAP assignment. The clusters are 
+clearly separated along the x axis: cluster 1 is concentrated in the range 20-170, while cluster 2 occupies the range 170-350. The boundary between 
+clusters lies around 170 (between 150 and 200), which corresponds to the value at which the posterior probabilities of the two components are approximately 
+equal.
+
+###.7 Plot the estimated mixture density together with the histogram of the observed data. Comment on the figure.
+
+```{r}
+plot(mod_clust, what = 'density', data = haemoglobin, xlab = "Haemoglobin")
+abline(v = mod_clust$parameters$mean, col = rep("red", 2), lty = c(2, 2))
+```
+
+The figure shows the histogram of the observed values of haemoglobin 
+together with the estimated mixture density (solid line).
+
+The mixture density shows a good agreement 
+with the observed distribution. In particular, the bimodal shape of the histogram is captured by the mixture: each peak in the histogram corresponds to one of the 2 component densities, suggesting that the observed heterogeneity is well explained by the 2 distinct subpopulations.
+
+
+This visual confirmation supports the choice of 2 components: a 
+unimodal model (e.g., single Gaussian) would fail to capture the observed 
+multimodality, while a model with more components would likely overfit.
